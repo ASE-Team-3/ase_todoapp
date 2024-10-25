@@ -46,7 +46,7 @@ dependencies:
   # Provides Internalization and localization facilities
   intl: ^0.17.0
   
-  flutter_datetime_picker: ^1.5.1
+  flutter_datetime_picker_plus: ^2.2.0
   animate_do: ^2.1.0
   flutter_beautiful_popup: ^1.7.0
   panara_dialogs: ^0.1.2
