@@ -38,7 +38,6 @@ dependencies:
 
   # Database
   hive: ^2.0.4
-  hive_flutter: ^1.1.0
 
   # Generate RFC4122
   uuid: ^3.0.5
