@@ -1,5 +1,4 @@
 import 'dart:developer';
-
 import 'package:app/extensions/space_exs.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
@@ -20,28 +19,25 @@ class _TaskViewState extends State<TaskView> {
   final TextEditingController titleTaskController = TextEditingController();
   final TextEditingController descriptionTaskController =
       TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     var textTheme = Theme.of(context).textTheme;
     return GestureDetector(
-      onTap: () => FocusManager.instance.primaryFocus!.unfocus(),
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         appBar: const TaskViewAppBar(),
-
-        //Body
-        body: SizedBox(
-          width: double.infinity,
-          height: double.infinity,
+        body: Padding(
+          padding: const EdgeInsets.all(16.0), // Consistent padding
           child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch, // Full-width alignment
             children: [
-              /// Top Side Texts
               _buildTopSideTexts(textTheme),
-
-              /// Main Task View Activity
-              _buildMainTaskViewActivity(textTheme, context),
-
-              /// Bottom Side Buttons
-              _buildBottomSideButtons()
+              const SizedBox(height: 16), // Spacing between sections
+              Expanded(child: _buildMainTaskViewActivity(textTheme, context)),
+              const SizedBox(height: 16), // Spacing before buttons
+              _buildBottomSideButtons(),
             ],
           ),
         ),
@@ -49,162 +45,138 @@ class _TaskViewState extends State<TaskView> {
     );
   }
 
-  /// Bottom Side Buttons
   Widget _buildBottomSideButtons() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          /// Delete Current Task Button
-          MaterialButton(
-            onPressed: () {
-              log("TASK DELETED");
-            },
-            minWidth: 150,
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            height: 55,
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.close,
-                  color: AppColors.primaryColor,
-                ),
-                5.w,
-                const Text(
-                  AppStr.deleteTask,
-                  style: TextStyle(
-                    color: AppColors.primaryColor,
-                  ),
-                )
-              ],
-            ),
-          ),
-
-          /// Add or Update
-          MaterialButton(
-            onPressed: () {
-              log("TASK ADDED");
-            },
-            minWidth: 150,
-            color: AppColors.primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            height: 55,
-            child: const Row(
-              children: [
-                Text(
-                  AppStr.addTaskString,
-                  style: TextStyle(
-                    color: Colors.white,
-                  ),
-                )
-              ],
-            ),
-          )
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildButton(
+          label: AppStr.deleteTask,
+          icon: Icons.close,
+          color: Colors.white,
+          onPressed: () {
+            log("TASK DELETED");
+          },
+        ),
+        _buildButton(
+          label: AppStr.addTaskString,
+          icon: null,
+          color: AppColors.primaryColor,
+          onPressed: () {
+            log("TASK ADDED");
+          },
+        ),
+      ],
     );
   }
 
-  /// Main Task View Activity
-  Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 400,
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildButton(
+      {required String label,
+      IconData? icon,
+      required Color color,
+      required VoidCallback onPressed}) {
+    return Container(
+      width: 150,
+      height: 55,
+      child: MaterialButton(
+        onPressed: onPressed,
+        color: color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          mainAxisAlignment:
+              icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 30),
-              child: Text(
-                AppStr.titleOfTitleTextField,
-                style: textTheme.headlineMedium,
-              ),
+            if (icon != null) Icon(icon, color: AppColors.primaryColor),
+            if (icon != null)
+              const SizedBox(width: 8), // Spacing between icon and text
+            Text(
+              label,
+              style: TextStyle(
+                  color: icon != null ? AppColors.primaryColor : Colors.white),
             ),
-
-            // Task Title
-            RepTextField(
-              controller: titleTaskController,
-            ),
-
-            10.h,
-
-            // Task description
-            RepTextField(
-              controller: descriptionTaskController,
-              isForDescription: true,
-            ),
-
-            /// Time Selector
-            DateTimeSelectionWidget(
-              onTap: () {
-                DatePicker.showTimePicker(
-                  context,
-                  // TODO: LATER IMPLEMENTATION
-                  onChanged: (_) {},
-                  onConfirm: (_) {},
-                );
-              },
-              title: AppStr.timeString,
-            ),
-
-            // Date Selector
-            DateTimeSelectionWidget(
-              onTap: () {
-                DatePicker.showDatePicker(
-                  context,
-                  // TODO: LATER IMPLEMENTATION
-                  onConfirm: (_) {},
-                );
-              },
-              title: AppStr.dateString,
-            )
           ],
         ),
       ),
     );
   }
 
-  /// Top Side Texts
-  Widget _buildTopSideTexts(TextTheme textTheme) {
-    return SizedBox(
-      width: double.infinity,
-      height: 100,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
+  Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(
-            width: 70,
-            child: Divider(
-              thickness: 2,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0, left: 20),
+            child: Text(
+              AppStr.titleOfTitleTextField,
+              style: textTheme.headlineMedium,
             ),
           ),
-          // TODO: ADD OR UPDATE TASK BASED ON CONDITIONS
-          RichText(
-              text: TextSpan(
-            text: AppStr.addNewTask,
-            style: textTheme.titleLarge,
-            children: const [
-              TextSpan(
-                text: AppStr.taskStrnig,
-                style: TextStyle(
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          )),
+          // Add hint text for the title field
+          RepTextField(
+            controller: titleTaskController,
+            hintText: AppStr.placeholderTitle, // Placeholder text
+          ),
+          const SizedBox(height: 16), // Consistent spacing
+          RepTextField(
+            controller: descriptionTaskController,
+            isForDescription: true,
+            hintText: AppStr
+                .placeholderDescription, // Optional placeholder for description
+          ),
+          const SizedBox(height: 16), // Spacing before date/time selectors
+          DateTimeSelectionWidget(
+            onTap: () {
+              DatePicker.showTimePicker(context,
+                  onChanged: (_) {}, onConfirm: (_) {});
+            },
+            title: AppStr.timeString,
+          ),
+          const SizedBox(height: 16), // Spacing before date selector
+          DateTimeSelectionWidget(
+            onTap: () {
+              DatePicker.showDatePicker(context, onConfirm: (_) {});
+            },
+            title: AppStr.dateString,
+          ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(
-            width: 70,
+  Widget _buildTopSideTexts(TextTheme textTheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          vertical: 16.0), // Vertical padding for spacing
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Left Divider
+          Expanded(
             child: Divider(
               thickness: 2,
+              color: Colors.grey.shade300,
+            ),
+          ),
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16.0), // Add horizontal padding
+            child: Text(
+              AppStr.addNewTask + AppStr.taskStrnig,
+              style: textTheme.headlineLarge?.copyWith(
+                fontWeight: FontWeight.bold, // Make the title bold
+                color: Colors.black, // Use a contrasting color
+              ),
+              textAlign: TextAlign.center, // Center text
+            ),
+          ),
+          // Right Divider
+          Expanded(
+            child: Divider(
+              thickness: 2,
+              color: Colors.grey.shade300,
             ),
           ),
         ],

@@ -1,45 +1,33 @@
+import 'dart:developer';
+
 import 'package:app/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class TaskWidget extends StatelessWidget {
-  const TaskWidget({
-    super.key,
-  });
+  const TaskWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
         // Navigate to Task view to see Task Details
+        log('Task details');
       },
-      child: AnimatedContainer(
-        margin: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 4, // Provides a material design shadow
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(12), // Rounded corners for a softer look
         ),
-        decoration: BoxDecoration(
-            color: AppColors.primaryColor.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(.1),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10)
-            ]),
-        duration: const Duration(milliseconds: 600),
         child: ListTile(
           // Check Icon
           leading: GestureDetector(
             onTap: () {
-              // check or uncheck the task
+              // Check or uncheck the task
             },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              decoration: BoxDecoration(
-                color: AppColors.primaryColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey, width: .8),
-              ),
+            child: CircleAvatar(
+              backgroundColor: AppColors.primaryColor,
               child: const Icon(
                 Icons.check,
                 color: Colors.white,
@@ -48,14 +36,14 @@ class TaskWidget extends StatelessWidget {
           ),
 
           // Task Title
-          title: const Padding(
-            padding: EdgeInsets.only(bottom: 5, top: 3),
+          title: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Text(
               "Done",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
             ),
           ),
 
@@ -63,40 +51,32 @@ class TaskWidget extends StatelessWidget {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Descriptions",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w300,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w400,
+                    ),
               ),
-
-              //Date of Task
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 10, top: 10),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Date",
-                        style: TextStyle(
-                          fontSize: 14,
+              const SizedBox(height: 8), // Spacing between description and date
+              // Date of Task
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Date",
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
                           color: Colors.grey,
                         ),
-                      ),
-                      Text(
-                        "SubDate",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      )
-                    ],
                   ),
-                ),
-              )
+                  Text(
+                    "SubDate",
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          color: Colors.grey,
+                        ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

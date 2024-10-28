@@ -7,6 +7,9 @@ class AppStr {
   static const String taskStrnig = "Task";
   static const String titleOfTitleTextField = "What are you planing😇?";
   static const String addNote = 'Add Note';
+  static const String placeholderTitle = "Enter task title"; // New placeholder
+  static const String placeholderDescription =
+      "Enter task description"; // Optional
   static const String timeString = "Time";
   static const String dateString = "Date";
   static const String deleteTask = "Delete Task";
