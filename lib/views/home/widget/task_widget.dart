@@ -1,78 +1,77 @@
+// views/tasks/widget/task_widget.dart
 import 'dart:developer';
-
 import 'package:app/utils/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:app/models/task.dart';
 
 class TaskWidget extends StatelessWidget {
-  const TaskWidget({super.key});
+  final Task task;
+  final VoidCallback onToggleComplete;
+
+  const TaskWidget({
+    super.key,
+    required this.task,
+    required this.onToggleComplete,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Navigate to Task view to see Task Details
-        log('Task details');
+        log('Task details for ${task.title}');
       },
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        elevation: 4, // Provides a material design shadow
+        elevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(12), // Rounded corners for a softer look
+          borderRadius: BorderRadius.circular(12),
         ),
         child: ListTile(
-          // Check Icon
           leading: GestureDetector(
-            onTap: () {
-              // Check or uncheck the task
-            },
+            onTap: onToggleComplete,
             child: CircleAvatar(
-              backgroundColor: AppColors.primaryColor,
-              child: const Icon(
-                Icons.check,
+              backgroundColor:
+                  task.isCompleted ? Colors.green : AppColors.primaryColor,
+              child: Icon(
+                task.isCompleted ? Icons.check : Icons.radio_button_unchecked,
                 color: Colors.white,
               ),
             ),
           ),
-
-          // Task Title
           title: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Text(
-              "Done",
+              task.title,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
             ),
           ),
-
-          // Task Description
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Descriptions",
+                task.description,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey,
                       fontWeight: FontWeight.w400,
                     ),
               ),
-              const SizedBox(height: 8), // Spacing between description and date
-              // Date of Task
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Date",
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          color: Colors.grey,
+                    "Due: ${_formatDate(task.deadline)}",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
                         ),
                   ),
                   Text(
-                    "SubDate",
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          color: Colors.grey,
+                    "Created at: ${_formatDate(task.creationDate)}", // Display CreateDate
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
                         ),
                   ),
                 ],
@@ -82,5 +81,9 @@ class TaskWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year}";
   }
 }

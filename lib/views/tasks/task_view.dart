@@ -1,5 +1,4 @@
 import 'dart:developer';
-import 'package:app/extensions/space_exs.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
@@ -7,6 +6,9 @@ import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:app/models/task.dart'; // Import your Task model
+import 'package:app/providers/task_provider.dart'; // Import your TaskProvider
 
 class TaskView extends StatefulWidget {
   const TaskView({super.key});
@@ -19,6 +21,7 @@ class _TaskViewState extends State<TaskView> {
   final TextEditingController titleTaskController = TextEditingController();
   final TextEditingController descriptionTaskController =
       TextEditingController();
+  DateTime? selectedDeadline;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +48,7 @@ class _TaskViewState extends State<TaskView> {
     );
   }
 
+  // Bottom buttons for adding and deleting tasks
   Widget _buildBottomSideButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -54,7 +58,7 @@ class _TaskViewState extends State<TaskView> {
           icon: Icons.close,
           color: Colors.white,
           onPressed: () {
-            log("TASK DELETED");
+            log("TASK DELETED"); // Log the delete action
           },
         ),
         _buildButton(
@@ -62,19 +66,49 @@ class _TaskViewState extends State<TaskView> {
           icon: null,
           color: AppColors.primaryColor,
           onPressed: () {
-            log("TASK ADDED");
+            _saveTask(); // Call the save function
           },
         ),
       ],
     );
   }
 
-  Widget _buildButton(
-      {required String label,
-      IconData? icon,
-      required Color color,
-      required VoidCallback onPressed}) {
-    return Container(
+  // Function to save task with validations
+  void _saveTask() {
+    if (titleTaskController.text.isNotEmpty &&
+        descriptionTaskController.text.isNotEmpty &&
+        selectedDeadline != null) {
+      final newTask = Task(
+        title: titleTaskController.text,
+        description: descriptionTaskController.text,
+        deadline: selectedDeadline!,
+      );
+
+      // Save task using provider
+      Provider.of<TaskProvider>(context, listen: false).addTask(newTask);
+
+      // Clear fields after saving
+      titleTaskController.clear();
+      descriptionTaskController.clear();
+      setState(() => selectedDeadline = null);
+
+      Navigator.pop(context); // Navigate back after saving
+    } else {
+      // Handle empty fields
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+    }
+  }
+
+  // Reusable button widget
+  Widget _buildButton({
+    required String label,
+    IconData? icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
       width: 150,
       height: 55,
       child: MaterialButton(
@@ -101,6 +135,7 @@ class _TaskViewState extends State<TaskView> {
     );
   }
 
+  // Main task creation form
   Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
     return SingleChildScrollView(
       child: Column(
@@ -108,12 +143,9 @@ class _TaskViewState extends State<TaskView> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 20),
-            child: Text(
-              AppStr.titleOfTitleTextField,
-              style: textTheme.headlineMedium,
-            ),
+            child: Text(AppStr.titleOfTitleTextField,
+                style: textTheme.headlineMedium),
           ),
-          // Add hint text for the title field
           RepTextField(
             controller: titleTaskController,
             hintText: AppStr.placeholderTitle, // Placeholder text
@@ -122,21 +154,28 @@ class _TaskViewState extends State<TaskView> {
           RepTextField(
             controller: descriptionTaskController,
             isForDescription: true,
-            hintText: AppStr
-                .placeholderDescription, // Optional placeholder for description
+            hintText: AppStr.placeholderDescription,
           ),
           const SizedBox(height: 16), // Spacing before date/time selectors
           DateTimeSelectionWidget(
             onTap: () {
-              DatePicker.showTimePicker(context,
-                  onChanged: (_) {}, onConfirm: (_) {});
+              DatePicker.showTimePicker(context, onChanged: (_) {},
+                  onConfirm: (date) {
+                setState(() {
+                  selectedDeadline = date; // Store the selected time
+                });
+              });
             },
             title: AppStr.timeString,
           ),
           const SizedBox(height: 16), // Spacing before date selector
           DateTimeSelectionWidget(
             onTap: () {
-              DatePicker.showDatePicker(context, onConfirm: (_) {});
+              DatePicker.showDatePicker(context, onConfirm: (date) {
+                setState(() {
+                  selectedDeadline = date; // Store the selected date
+                });
+              });
             },
             title: AppStr.dateString,
           ),
@@ -145,40 +184,26 @@ class _TaskViewState extends State<TaskView> {
     );
   }
 
+  // Top header with title text
   Widget _buildTopSideTexts(TextTheme textTheme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          vertical: 16.0), // Vertical padding for spacing
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left Divider
-          Expanded(
-            child: Divider(
-              thickness: 2,
-              color: Colors.grey.shade300,
-            ),
-          ),
-          // Title
+          Expanded(child: Divider(thickness: 2, color: Colors.grey.shade300)),
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16.0), // Add horizontal padding
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               AppStr.addNewTask + AppStr.taskStrnig,
               style: textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.bold, // Make the title bold
-                color: Colors.black, // Use a contrasting color
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
-              textAlign: TextAlign.center, // Center text
+              textAlign: TextAlign.center,
             ),
           ),
-          // Right Divider
-          Expanded(
-            child: Divider(
-              thickness: 2,
-              color: Colors.grey.shade300,
-            ),
-          ),
+          Expanded(child: Divider(thickness: 2, color: Colors.grey.shade300)),
         ],
       ),
     );

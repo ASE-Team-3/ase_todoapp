@@ -10,6 +10,8 @@ import 'package:app/views/home/widget/task_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slider_drawer/flutter_slider_drawer.dart';
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
+import 'package:app/providers/task_provider.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -20,7 +22,6 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   GlobalKey<SliderDrawerState> drawerKey = GlobalKey<SliderDrawerState>();
-  final List<int> testing = [1, 2];
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +30,7 @@ class _HomeViewState extends State<HomeView> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: Fab(),
+      floatingActionButton: const Fab(),
       body: SliderDrawer(
         key: drawerKey,
         isDraggable: false,
@@ -79,36 +80,51 @@ class _HomeViewState extends State<HomeView> {
                 children: [
                   Text(AppStr.mainTitle, style: textTheme.displayLarge),
                   3.h,
-                  Text("1 of 3 Task", style: textTheme.titleMedium),
+                  Consumer<TaskProvider>(
+                    builder: (context, taskProvider, _) {
+                      return Text(
+                        "1 of ${taskProvider.tasks.length} Tasks",
+                        style: textTheme.titleMedium,
+                      );
+                    },
+                  ),
                 ],
               ),
             ],
           ),
-          // You can add more widgets to the header if needed.
         ],
       ),
     );
   }
 
   Widget _buildTaskList(TextTheme textTheme) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: testing.isNotEmpty
-          ? ListView.builder(
-              itemCount: testing.length,
-              itemBuilder: (context, index) {
-                return Dismissible(
-                  direction: DismissDirection.horizontal,
-                  onDismissed: (_) {
-                    // Handle task removal from DB here
+    return Consumer<TaskProvider>(
+      builder: (context, taskProvider, child) {
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: taskProvider.tasks.isNotEmpty
+              ? ListView.builder(
+                  itemCount: taskProvider.tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = taskProvider.tasks[index];
+                    return Dismissible(
+                      direction: DismissDirection.horizontal,
+                      onDismissed: (_) {
+                        taskProvider.removeTask(task);
+                      },
+                      background: _buildDismissBackground(),
+                      key: Key(task.id), // Use UUID as key
+                      child: TaskWidget(
+                        task: task,
+                        onToggleComplete: () =>
+                            taskProvider.toggleTaskCompletion(task),
+                      ),
+                    );
                   },
-                  background: _buildDismissBackground(),
-                  key: Key(index.toString()),
-                  child: const TaskWidget(),
-                );
-              },
-            )
-          : _buildEmptyState(textTheme),
+                )
+              : _buildEmptyState(textTheme),
+        );
+      },
     );
   }
 
