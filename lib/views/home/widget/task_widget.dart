@@ -1,6 +1,6 @@
-// views/tasks/widget/task_widget.dart
 import 'dart:developer';
 import 'package:app/utils/app_colors.dart';
+import 'package:app/views/tasks/task_detail_view.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 
@@ -19,6 +19,12 @@ class TaskWidget extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         log('Task details for ${task.title}');
+        // Navigate to the TaskDetailView
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TaskDetailView(taskId: task.id),
+          ),
+        );
       },
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -69,7 +75,7 @@ class TaskWidget extends StatelessWidget {
                         ),
                   ),
                   Text(
-                    "Created at: ${_formatDate(task.creationDate)}", // Display CreateDate
+                    "Created at: ${_formatDate(task.creationDate)}", // Display creation date
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey.shade600,
                         ),
