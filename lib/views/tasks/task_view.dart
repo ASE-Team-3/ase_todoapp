@@ -1,14 +1,18 @@
+import 'dart:io';
 import 'dart:developer';
+import 'package:app/models/attachment.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:app/models/task.dart'; // Import your Task model
-import 'package:app/providers/task_provider.dart'; // Import your TaskProvider
+import 'package:app/models/task.dart';
+import 'package:app/providers/task_provider.dart';
+import 'package:uuid/uuid.dart';
 
 class TaskView extends StatefulWidget {
   const TaskView({super.key});
@@ -22,6 +26,7 @@ class _TaskViewState extends State<TaskView> {
   final TextEditingController descriptionTaskController =
       TextEditingController();
   DateTime? selectedDeadline;
+  List<Attachment> attachments = [];
 
   @override
   Widget build(BuildContext context) {
@@ -31,15 +36,16 @@ class _TaskViewState extends State<TaskView> {
       child: Scaffold(
         appBar: const TaskViewAppBar(),
         body: Padding(
-          padding: const EdgeInsets.all(16.0), // Consistent padding
+          padding: const EdgeInsets.all(16.0),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch, // Full-width alignment
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildTopSideTexts(textTheme),
-              const SizedBox(height: 16), // Spacing between sections
+              const SizedBox(height: 16),
               Expanded(child: _buildMainTaskViewActivity(textTheme, context)),
-              const SizedBox(height: 16), // Spacing before buttons
+              const SizedBox(height: 16),
+              _buildAttachmentsSection(),
+              const SizedBox(height: 16),
               _buildBottomSideButtons(),
             ],
           ),
@@ -58,7 +64,7 @@ class _TaskViewState extends State<TaskView> {
           icon: Icons.close,
           color: Colors.white,
           onPressed: () {
-            log("TASK DELETED"); // Log the delete action
+            log("TASK DELETED");
           },
         ),
         _buildButton(
@@ -66,7 +72,7 @@ class _TaskViewState extends State<TaskView> {
           icon: null,
           color: AppColors.primaryColor,
           onPressed: () {
-            _saveTask(); // Call the save function
+            _saveTask();
           },
         ),
       ],
@@ -82,19 +88,20 @@ class _TaskViewState extends State<TaskView> {
         title: titleTaskController.text,
         description: descriptionTaskController.text,
         deadline: selectedDeadline!,
+        attachments: attachments,
       );
 
-      // Save task using provider
       Provider.of<TaskProvider>(context, listen: false).addTask(newTask);
 
-      // Clear fields after saving
       titleTaskController.clear();
       descriptionTaskController.clear();
-      setState(() => selectedDeadline = null);
+      setState(() {
+        selectedDeadline = null;
+        attachments.clear();
+      });
 
-      Navigator.pop(context); // Navigate back after saving
+      Navigator.pop(context);
     } else {
-      // Handle empty fields
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields.')),
       );
@@ -122,8 +129,7 @@ class _TaskViewState extends State<TaskView> {
               icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
             if (icon != null) Icon(icon, color: AppColors.primaryColor),
-            if (icon != null)
-              const SizedBox(width: 8), // Spacing between icon and text
+            if (icon != null) const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
@@ -148,32 +154,32 @@ class _TaskViewState extends State<TaskView> {
           ),
           RepTextField(
             controller: titleTaskController,
-            hintText: AppStr.placeholderTitle, // Placeholder text
+            hintText: AppStr.placeholderTitle,
           ),
-          const SizedBox(height: 16), // Consistent spacing
+          const SizedBox(height: 16),
           RepTextField(
             controller: descriptionTaskController,
             isForDescription: true,
             hintText: AppStr.placeholderDescription,
           ),
-          const SizedBox(height: 16), // Spacing before date/time selectors
+          const SizedBox(height: 16),
           DateTimeSelectionWidget(
             onTap: () {
               DatePicker.showTimePicker(context, onChanged: (_) {},
                   onConfirm: (date) {
                 setState(() {
-                  selectedDeadline = date; // Store the selected time
+                  selectedDeadline = date;
                 });
               });
             },
             title: AppStr.timeString,
           ),
-          const SizedBox(height: 16), // Spacing before date selector
+          const SizedBox(height: 16),
           DateTimeSelectionWidget(
             onTap: () {
               DatePicker.showDatePicker(context, onConfirm: (date) {
                 setState(() {
-                  selectedDeadline = date; // Store the selected date
+                  selectedDeadline = date;
                 });
               });
             },
@@ -207,5 +213,131 @@ class _TaskViewState extends State<TaskView> {
         ],
       ),
     );
+  }
+
+  // Section to manage attachments
+  Widget _buildAttachmentsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Attachments',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _pickFile,
+              icon: const Icon(Icons.attach_file),
+              label: const Text('Attach File'),
+            ),
+            ElevatedButton.icon(
+              onPressed: _promptForLink,
+              icon: const Icon(Icons.link),
+              label: const Text('Add Link'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Column(
+          children: attachments
+              .map((attachment) => _buildAttachmentTile(attachment))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  // Individual attachment tile with delete option
+  Widget _buildAttachmentTile(Attachment attachment) {
+    return ListTile(
+      leading: Icon(_getAttachmentIcon(attachment.type)),
+      title: Text(attachment.name),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete, color: Colors.red),
+        onPressed: () => _removeAttachment(attachment.id),
+      ),
+    );
+  }
+
+  // Icon for each attachment type
+  IconData _getAttachmentIcon(AttachmentType type) {
+    switch (type) {
+      case AttachmentType.file:
+        return Icons.attach_file;
+      case AttachmentType.link:
+        return Icons.link;
+      case AttachmentType.image:
+        return Icons.image;
+      case AttachmentType.video:
+        return Icons.videocam;
+    }
+  }
+
+  // Method to pick files
+  void _pickFile() async {
+    final result = await FilePicker.platform.pickFiles();
+    if (result != null) {
+      final file = File(result.files.single.path!);
+      final newAttachment = Attachment(
+        id: const Uuid().v4(),
+        name: result.files.single.name,
+        path: file.path,
+        type: AttachmentType.file,
+      );
+      setState(() => attachments.add(newAttachment));
+    }
+  }
+
+  // Method to add links
+  void _promptForLink() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final linkController = TextEditingController();
+        return AlertDialog(
+          title: const Text("Add Link"),
+          content: TextField(
+            controller: linkController,
+            decoration: const InputDecoration(hintText: "Enter URL"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                if (linkController.text.isNotEmpty) {
+                  final newAttachment = Attachment(
+                    id: const Uuid().v4(),
+                    name: linkController.text,
+                    path: linkController.text,
+                    type: AttachmentType.link,
+                  );
+                  setState(() => attachments.add(newAttachment));
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Remove attachments by ID
+  void _removeAttachment(String attachmentId) {
+    setState(() {
+      attachments.removeWhere((a) => a.id == attachmentId);
+    });
+  }
+
+  @override
+  void dispose() {
+    titleTaskController.dispose();
+    descriptionTaskController.dispose();
+    super.dispose();
   }
 }
