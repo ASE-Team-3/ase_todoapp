@@ -24,6 +24,6 @@ class Task {
     List<SubTask>? subTasks, // Optional list of sub-tasks
   })  : id = id ?? const Uuid().v4(), // Generate a new UUID if none is provided
         creationDate = creationDate ?? DateTime.now(),
-        attachments = attachments = [],
+        attachments = attachments ?? [],
         subTasks = subTasks ?? []; // Initialize sub-tasks list
 }

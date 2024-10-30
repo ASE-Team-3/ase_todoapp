@@ -1,8 +1,11 @@
-// views/tasks/task_detail_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart'; // To open files on the device
 import 'package:app/models/task.dart';
+import 'package:app/models/attachment.dart';
 import 'package:app/providers/task_provider.dart';
+import 'package:file_picker/file_picker.dart'; // Import for file picking
 import 'widget/add_subtask_widget.dart';
 import 'widget/add_subtask_item_widget.dart';
 
@@ -25,9 +28,45 @@ class TaskDetailView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(task.description,
+            // Task description
+            Text('Attachments: ${task.attachments.length}',
                 style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 10),
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text("Add Attachment"),
+              onPressed: () => _addAttachment(context, taskProvider),
+            ),
             const SizedBox(height: 20),
+
+            // Attachments section
+            if (task.attachments.isNotEmpty) ...[
+              Text('Attachments',
+                  style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              ListView.builder(
+                shrinkWrap: true,
+                itemCount: task.attachments.length,
+                itemBuilder: (context, index) {
+                  final attachment = task.attachments[index];
+                  return ListTile(
+                    leading: Icon(_getAttachmentIcon(attachment.type)),
+                    title: Text(attachment.name),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        taskProvider.removeAttachment(task.id, attachment.id);
+                      },
+                    ),
+                    onTap: () => _openAttachment(attachment),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // Subtasks section
             Text('Subtasks', style: Theme.of(context).textTheme.headlineSmall),
             Expanded(
               child: ListView.builder(
@@ -100,5 +139,59 @@ class TaskDetailView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Function to add an attachment
+  Future<void> _addAttachment(
+      BuildContext context, TaskProvider taskProvider) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      final newAttachment = Attachment(
+        id: DateTime.now()
+            .millisecondsSinceEpoch
+            .toString(), // Unique ID for the attachment
+        name: file.name,
+        path: file.path ?? '',
+        type: AttachmentType.file, // Set based on your needs
+      );
+
+      taskProvider.addAttachment(taskId, newAttachment);
+    }
+  }
+
+  // Helper to get an icon based on attachment type
+  IconData _getAttachmentIcon(AttachmentType type) {
+    switch (type) {
+      case AttachmentType.file:
+        return Icons.attach_file;
+      case AttachmentType.link:
+        return Icons.link;
+      case AttachmentType.image:
+        return Icons.image;
+      case AttachmentType.video:
+        return Icons.videocam;
+      default:
+        return Icons.attachment;
+    }
+  }
+
+  // Open the attachment based on its type
+  void _openAttachment(Attachment attachment) async {
+    if (attachment.type == AttachmentType.link) {
+      final url = attachment.path;
+      if (await canLaunch(url)) {
+        await launch(url);
+      } else {
+        throw 'Could not launch $url';
+      }
+    } else if (attachment.type == AttachmentType.file) {
+      final filePath = attachment.path;
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        // Handle error if file could not be opened
+        print('Error opening file: ${result.message}');
+      }
+    }
   }
 }

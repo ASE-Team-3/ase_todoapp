@@ -1,4 +1,6 @@
 // models/attachment.dart
+import 'package:uuid/uuid.dart';
+
 enum AttachmentType { file, link, image, video }
 
 class Attachment {
@@ -8,9 +10,9 @@ class Attachment {
   final AttachmentType type;
 
   Attachment({
-    required this.id,
     required this.name,
     required this.path,
     required this.type,
-  });
+    String? id,
+  }) : id = id ?? const Uuid().v4();
 }
