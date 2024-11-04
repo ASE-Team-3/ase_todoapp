@@ -1,3 +1,4 @@
+// TaskDetailView.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,6 +7,7 @@ import 'package:app/models/task.dart';
 import 'package:app/models/attachment.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:file_picker/file_picker.dart'; // Import for file picking
+import 'package:app/views/tasks/task_view.dart'; // Import TaskView for editing tasks
 import 'widget/add_subtask_widget.dart';
 import 'widget/add_subtask_item_widget.dart';
 
@@ -17,11 +19,49 @@ class TaskDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     TaskProvider taskProvider = Provider.of<TaskProvider>(context);
-    Task task = taskProvider.tasks.firstWhere((t) => t.id == taskId);
+
+    // Attempt to find the task; handle not found gracefully
+    final task = taskProvider.tasks.firstWhere(
+      (t) => t.id == taskId,
+      orElse: () {
+        // Redirect to home if the task is not found
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Task not found. Redirecting to home.')),
+          );
+          Future.delayed(Duration(seconds: 2), () {
+            Navigator.popUntil(context, (route) => route.isFirst);
+          });
+        });
+        // Return a temporary task with a message (or you could handle it differently)
+        return Task(
+          id: taskId,
+          title: 'Task Not Found',
+          description: 'This task does not exist.',
+          deadline: DateTime.now(),
+          attachments: [],
+        );
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(task.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () {
+              // Navigate to the TaskView screen for editing
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      TaskView(task: task), // Pass the task to edit
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -32,7 +72,6 @@ class TaskDetailView extends StatelessWidget {
             Text('Attachments: ${task.attachments.length}',
                 style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 10),
-
             ElevatedButton.icon(
               icon: const Icon(Icons.add),
               label: const Text("Add Attachment"),
@@ -148,12 +187,10 @@ class TaskDetailView extends StatelessWidget {
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
       final newAttachment = Attachment(
-        id: DateTime.now()
-            .millisecondsSinceEpoch
-            .toString(), // Unique ID for the attachment
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: file.name,
         path: file.path ?? '',
-        type: AttachmentType.file, // Set based on your needs
+        type: AttachmentType.file,
       );
 
       taskProvider.addAttachment(taskId, newAttachment);

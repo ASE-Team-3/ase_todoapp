@@ -26,4 +26,26 @@ class Task {
         creationDate = creationDate ?? DateTime.now(),
         attachments = attachments ?? [],
         subTasks = subTasks ?? []; // Initialize sub-tasks list
+
+  Task copyWith({
+    String? id,
+    String? title,
+    String? description,
+    DateTime? deadline,
+    DateTime? creationDate,
+    List<Attachment>? attachments,
+    bool? isCompleted,
+    List<SubTask>? subTasks,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      deadline: deadline ?? this.deadline,
+      creationDate: creationDate ?? this.creationDate,
+      attachments: attachments ?? this.attachments,
+      isCompleted: isCompleted ?? this.isCompleted,
+      subTasks: subTasks ?? this.subTasks,
+    );
+  }
 }

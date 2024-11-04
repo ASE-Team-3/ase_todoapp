@@ -1,4 +1,6 @@
 // providers/task_provider.dart
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -16,6 +18,16 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateTask(Task updatedTask) {
+    int index = _tasks.indexWhere((task) => task.id == updatedTask.id);
+    if (index != -1) {
+      _tasks[index] = updatedTask;
+      notifyListeners();
+    } else {
+      throw Exception('Task with ID ${updatedTask.id} not found');
+    }
+  }
+
   // Toggle task completion status
   void toggleTaskCompletion(Task task) {
     task.isCompleted = !task.isCompleted;
@@ -24,8 +36,12 @@ class TaskProvider extends ChangeNotifier {
 
   // Remove a task
   void removeTask(Task task) {
-    _tasks.removeWhere((t) => t.id == task.id); // Use UUID for removal
-    notifyListeners();
+    if (_tasks.any((t) => t.id == task.id)) {
+      _tasks.removeWhere((t) => t.id == task.id);
+      notifyListeners();
+    } else {
+      log('Task not found for deletion');
+    }
   }
 
   // Add a sub-task to a task

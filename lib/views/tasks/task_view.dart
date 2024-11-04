@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:app/models/attachment.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
+import 'package:app/views/home/home_view.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
@@ -15,7 +16,9 @@ import 'package:app/providers/task_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class TaskView extends StatefulWidget {
-  const TaskView({super.key});
+  final Task? task; // Add Task parameter for editing
+
+  const TaskView({super.key, this.task});
 
   @override
   State<TaskView> createState() => _TaskViewState();
@@ -27,6 +30,18 @@ class _TaskViewState extends State<TaskView> {
       TextEditingController();
   DateTime? selectedDeadline;
   List<Attachment> attachments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.task != null) {
+      // Initialize fields with task data if editing
+      titleTaskController.text = widget.task!.title;
+      descriptionTaskController.text = widget.task!.description;
+      selectedDeadline = widget.task!.deadline;
+      attachments = List.from(widget.task!.attachments);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,57 +69,84 @@ class _TaskViewState extends State<TaskView> {
     );
   }
 
-  // Bottom buttons for adding and deleting tasks
   Widget _buildBottomSideButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
+        if (widget.task != null) // Show delete only if editing
+          _buildButton(
+            label: AppStr.deleteTask,
+            icon: Icons.close,
+            color: Colors.white,
+            onPressed: _deleteTask,
+          ),
         _buildButton(
-          label: AppStr.deleteTask,
-          icon: Icons.close,
-          color: Colors.white,
-          onPressed: () {
-            log("TASK DELETED");
-          },
-        ),
-        _buildButton(
-          label: AppStr.addTaskString,
+          label: widget.task == null
+              ? AppStr.addTaskString
+              : AppStr.updateTaskString,
           icon: null,
           color: AppColors.primaryColor,
-          onPressed: () {
-            _saveTask();
-          },
+          onPressed: _saveOrUpdateTask,
         ),
       ],
     );
   }
 
-  // Function to save task with validations
-  void _saveTask() {
+  void _saveOrUpdateTask() {
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         selectedDeadline != null) {
-      final newTask = Task(
-        title: titleTaskController.text,
-        description: descriptionTaskController.text,
-        deadline: selectedDeadline!,
-        attachments: attachments,
-      );
+      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
-      Provider.of<TaskProvider>(context, listen: false).addTask(newTask);
+      if (widget.task == null) {
+        // Creating a new task
+        final newTask = Task(
+          id: const Uuid().v4(),
+          title: titleTaskController.text,
+          description: descriptionTaskController.text,
+          deadline: selectedDeadline!,
+          attachments: attachments,
+        );
+        taskProvider.addTask(newTask);
+      } else {
+        // Updating an existing task
+        final updatedTask = widget.task!.copyWith(
+          title: titleTaskController.text,
+          description: descriptionTaskController.text,
+          deadline: selectedDeadline!,
+          attachments: attachments,
+        );
+        taskProvider.updateTask(updatedTask);
+      }
 
+      // Clear fields and close the view
       titleTaskController.clear();
       descriptionTaskController.clear();
       setState(() {
         selectedDeadline = null;
         attachments.clear();
       });
-
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields.')),
       );
+    }
+  }
+
+  void _deleteTask() {
+    if (widget.task != null) {
+      try {
+        Provider.of<TaskProvider>(context, listen: false)
+            .removeTask(widget.task!);
+        Navigator.of(context)
+            .pop(MaterialPageRoute(builder: (context) => const HomeView()));
+      } catch (e) {
+        log('Error deleting task: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete task.')),
+        );
+      }
     }
   }
 
