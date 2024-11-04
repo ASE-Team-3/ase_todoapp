@@ -1,13 +1,14 @@
-// TaskDetailView.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:open_file/open_file.dart'; // To open files on the device
+import 'package:open_file/open_file.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/attachment.dart';
 import 'package:app/providers/task_provider.dart';
-import 'package:file_picker/file_picker.dart'; // Import for file picking
-import 'package:app/views/tasks/task_view.dart'; // Import TaskView for editing tasks
+import 'package:file_picker/file_picker.dart';
+import 'package:app/views/tasks/task_view.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'widget/add_subtask_widget.dart';
 import 'widget/add_subtask_item_widget.dart';
 
@@ -44,6 +45,12 @@ class TaskDetailView extends StatelessWidget {
       },
     );
 
+    // Format the dates in local timezone
+    final formattedDeadline =
+        DateFormat.yMMMd().add_jm().format(task.deadline.toLocal());
+    final formattedCreationDate =
+        DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
+
     return Scaffold(
       appBar: AppBar(
         title: Text(task.title),
@@ -55,8 +62,7 @@ class TaskDetailView extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      TaskView(task: task), // Pass the task to edit
+                  builder: (context) => TaskView(task: task),
                 ),
               );
             },
@@ -65,27 +71,106 @@ class TaskDetailView extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            // Task Details Card
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Task Description
+                    Text('Description:',
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 5),
+                    Text(task.description,
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 10),
+
+                    Divider(),
+
+                    // Display formatted Task Deadline
+                    Text('Deadline:',
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 5),
+                    Text(formattedDeadline,
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 10),
+
+                    Divider(),
+
+                    // Display formatted Task Creation Date
+                    Text('Created On:',
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 5),
+                    Text(formattedCreationDate,
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 10),
+
+                    Divider(),
+
+                    // Task Completion Status
+                    Row(
+                      children: [
+                        Text('Completed:',
+                            style: Theme.of(context).textTheme.headlineMedium),
+                        Checkbox(
+                          value: task.isCompleted,
+                          onChanged: (value) {
+                            taskProvider.toggleTaskCompletion(task);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Attachments Section
+            _buildAttachmentsSection(context, task, taskProvider),
+
+            const SizedBox(height: 20),
+
+            // Subtasks Section
+            _buildSubtasksSection(context, task, taskProvider),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsSection(
+      BuildContext context, Task task, TaskProvider taskProvider) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Task description
-            Text('Attachments: ${task.attachments.length}',
-                style: Theme.of(context).textTheme.bodyLarge),
+            Text('Attachments',
+                style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 10),
             ElevatedButton.icon(
               icon: const Icon(Icons.add),
               label: const Text("Add Attachment"),
               onPressed: () => _addAttachment(context, taskProvider),
             ),
-            const SizedBox(height: 20),
-
-            // Attachments section
-            if (task.attachments.isNotEmpty) ...[
-              Text('Attachments',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            if (task.attachments.isNotEmpty)
               ListView.builder(
                 shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: task.attachments.length,
                 itemBuilder: (context, index) {
                   final attachment = task.attachments[index];
@@ -102,17 +187,38 @@ class TaskDetailView extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 20),
-            ],
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Subtasks section
-            Text('Subtasks', style: Theme.of(context).textTheme.headlineSmall),
-            Expanded(
-              child: ListView.builder(
+  Widget _buildSubtasksSection(
+      BuildContext context, Task task, TaskProvider taskProvider) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Subtasks', style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 10),
+            if (task.subTasks.isNotEmpty)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: task.subTasks.length,
                 itemBuilder: (context, index) {
                   final subTask = task.subTasks[index];
                   return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: ExpansionTile(
                       title: Text(subTask.title),
                       subtitle: Text(subTask.description),
@@ -136,7 +242,7 @@ class TaskDetailView extends StatelessWidget {
                       children: [
                         ListView.builder(
                           shrinkWrap: true,
-                          physics: const ClampingScrollPhysics(),
+                          physics: const NeverScrollableScrollPhysics(),
                           itemCount: subTask.items.length,
                           itemBuilder: (context, itemIndex) {
                             final item = subTask.items[itemIndex];
@@ -172,7 +278,6 @@ class TaskDetailView extends StatelessWidget {
                   );
                 },
               ),
-            ),
             AddSubTaskWidget(taskId: task.id),
           ],
         ),
@@ -217,8 +322,8 @@ class TaskDetailView extends StatelessWidget {
   void _openAttachment(Attachment attachment) async {
     if (attachment.type == AttachmentType.link) {
       final url = attachment.path;
-      if (await canLaunch(url)) {
-        await launch(url);
+      if (await canLaunchUrlString(url)) {
+        await launchUrlString(url);
       } else {
         throw 'Could not launch $url';
       }
@@ -226,8 +331,7 @@ class TaskDetailView extends StatelessWidget {
       final filePath = attachment.path;
       final result = await OpenFile.open(filePath);
       if (result.type != ResultType.done) {
-        // Handle error if file could not be opened
-        print('Error opening file: ${result.message}');
+        // TODO: Handle error if file could not be opened
       }
     }
   }
