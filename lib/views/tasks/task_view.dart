@@ -205,27 +205,50 @@ class _TaskViewState extends State<TaskView> {
             hintText: AppStr.placeholderDescription,
           ),
           const SizedBox(height: 16),
+          // Use DateTimeSelectionWidget for deadline date
           DateTimeSelectionWidget(
-            onTap: () {
-              DatePicker.showTimePicker(context, onChanged: (_) {},
-                  onConfirm: (date) {
-                setState(() {
-                  selectedDeadline = date;
-                });
-              });
-            },
-            title: AppStr.timeString,
-          ),
-          const SizedBox(height: 16),
-          DateTimeSelectionWidget(
+            title: selectedDeadline != null
+                ? "${selectedDeadline!.toLocal()}"
+                    .split(' ')[0] // Display the date
+                : 'Select Date',
             onTap: () {
               DatePicker.showDatePicker(context, onConfirm: (date) {
                 setState(() {
-                  selectedDeadline = date;
+                  selectedDeadline = DateTime(
+                    date.year,
+                    date.month,
+                    date.day,
+                    selectedDeadline?.hour ?? 0,
+                    selectedDeadline?.minute ?? 0,
+                  );
                 });
               });
             },
-            title: AppStr.dateString,
+          ),
+          const SizedBox(height: 16),
+          // Use DateTimeSelectionWidget for deadline time
+          DateTimeSelectionWidget(
+            title: selectedDeadline != null
+                ? "${selectedDeadline!.hour}:${selectedDeadline!.minute}" // Display the time
+                : 'Select Time',
+            onTap: () {
+              DatePicker.showTimePicker(context, onChanged: (_) {},
+                  onConfirm: (time) {
+                setState(() {
+                  if (selectedDeadline != null) {
+                    selectedDeadline = DateTime(
+                      selectedDeadline!.year,
+                      selectedDeadline!.month,
+                      selectedDeadline!.day,
+                      time.hour,
+                      time.minute,
+                    );
+                  } else {
+                    selectedDeadline = time;
+                  }
+                });
+              });
+            },
           ),
         ],
       ),
