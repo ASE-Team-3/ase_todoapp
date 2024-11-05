@@ -49,6 +49,7 @@ class _TaskViewState extends State<TaskView> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: const TaskViewAppBar(),
         body: Padding(
           padding: const EdgeInsets.all(16.0),

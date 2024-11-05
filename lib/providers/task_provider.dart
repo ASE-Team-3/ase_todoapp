@@ -28,6 +28,16 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
+  // Method to retrieve a task by ID
+  Task? getTaskById(String taskId) {
+    try {
+      return _tasks.firstWhere((task) => task.id == taskId);
+    } catch (e) {
+      log('Task with ID $taskId not found');
+      return null; // Return null if task is not found
+    }
+  }
+
   // Toggle task completion status
   void toggleTaskCompletion(Task task) {
     task.isCompleted = !task.isCompleted;
@@ -60,6 +70,19 @@ class TaskProvider extends ChangeNotifier {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     task.subTasks.removeWhere((st) => st.id == subTaskId);
     toggleTaskCompletion(task);
+    notifyListeners();
+  }
+
+  void toggleSubTaskCompletion(String taskId, String subTaskId) {
+    final task = _tasks.firstWhere((t) => t.id == taskId);
+    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
+
+    // Toggle the completion status of the subtask
+    subTask.isCompleted = !subTask.isCompleted;
+
+    // Check if all subtasks are completed and update the task's completion status
+    task.isCompleted = task.subTasks.every((subTask) => subTask.isCompleted);
+
     notifyListeners();
   }
 

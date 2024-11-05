@@ -1,8 +1,8 @@
-// views/tasks/widget/add_subtask_widget.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/providers/task_provider.dart';
+import 'package:app/utils/app_colors.dart';
 
 class AddSubTaskWidget extends StatefulWidget {
   final String taskId;
@@ -14,46 +14,123 @@ class AddSubTaskWidget extends StatefulWidget {
 }
 
 class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
+  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   void _addSubTask() {
-    if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      return;
+    if (_formKey.currentState!.validate()) {
+      final newSubTask = SubTask(
+        title: _titleController.text,
+        description: _descriptionController.text,
+      );
+
+      Provider.of<TaskProvider>(context, listen: false)
+          .addSubTask(widget.taskId, newSubTask);
+
+      // Clear the form
+      _titleController.clear();
+      _descriptionController.clear();
+
+      // Show a success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Subtask added successfully')),
+      );
+
+      // Close the modal
+      Navigator.pop(context);
     }
-
-    final newSubTask = SubTask(
-      title: _titleController.text,
-      description: _descriptionController.text,
-    );
-
-    Provider.of<TaskProvider>(context, listen: false)
-        .addSubTask(widget.taskId, newSubTask);
-
-    _titleController.clear();
-    _descriptionController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _titleController,
-          decoration: const InputDecoration(labelText: 'Subtask Title'),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Card(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _descriptionController,
-          decoration: const InputDecoration(labelText: 'Subtask Description'),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add Subtask',
+                  style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Subtask Title',
+                    labelStyle: TextStyle(color: AppColors.primaryColor),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.primaryColor),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Subtask Description',
+                    labelStyle: TextStyle(color: AppColors.primaryColor),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.primaryColor),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a description';
+                    }
+                    return null;
+                  },
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: _addSubTask,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Subtask'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: _addSubTask,
-          child: const Text('Add Subtask'),
-        ),
-      ],
+      ),
     );
   }
 }
