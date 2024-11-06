@@ -1,6 +1,5 @@
 // providers/task_provider.dart
 import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -11,6 +10,9 @@ class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
 
   List<Task> get tasks => _tasks;
+
+  // Computed property to count completed tasks
+  int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
   // Add a new task
   void addTask(Task task) {
@@ -34,7 +36,7 @@ class TaskProvider extends ChangeNotifier {
       return _tasks.firstWhere((task) => task.id == taskId);
     } catch (e) {
       log('Task with ID $taskId not found');
-      return null; // Return null if task is not found
+      return null;
     }
   }
 

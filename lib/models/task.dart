@@ -7,8 +7,10 @@ class Task {
   final String id; // UUID
   final String title;
   final String description;
-  final DateTime deadline;
+  final DateTime deadline; // Keep the original deadline property
   final DateTime creationDate;
+  final int
+      priority; // New priority field (1 for high, 2 for medium, 3 for low)
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
@@ -16,7 +18,8 @@ class Task {
   Task({
     required this.title,
     required this.description,
-    required this.deadline,
+    required this.deadline, // Retain the deadline field
+    this.priority = 2, // Default priority (medium)
     DateTime? creationDate,
     String? id, // Nullable parameter for UUID
     this.isCompleted = false,
@@ -33,6 +36,7 @@ class Task {
     String? description,
     DateTime? deadline,
     DateTime? creationDate,
+    int? priority, // Include priority in copyWith
     List<Attachment>? attachments,
     bool? isCompleted,
     List<SubTask>? subTasks,
@@ -41,8 +45,9 @@ class Task {
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
-      deadline: deadline ?? this.deadline,
+      deadline: deadline ?? this.deadline, // Retain the deadline parameter
       creationDate: creationDate ?? this.creationDate,
+      priority: priority ?? this.priority, // Set the new priority field
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
