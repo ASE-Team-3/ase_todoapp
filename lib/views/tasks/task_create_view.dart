@@ -15,16 +15,16 @@ import 'package:app/models/task.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:uuid/uuid.dart';
 
-class TaskView extends StatefulWidget {
+class TaskCreateView extends StatefulWidget {
   final Task? task; // Add Task parameter for editing
 
-  const TaskView({super.key, this.task});
+  const TaskCreateView({super.key, this.task});
 
   @override
-  State<TaskView> createState() => _TaskViewState();
+  State<TaskCreateView> createState() => _TaskCreateViewState();
 }
 
-class _TaskViewState extends State<TaskView> {
+class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController titleTaskController = TextEditingController();
   final TextEditingController descriptionTaskController =
       TextEditingController();

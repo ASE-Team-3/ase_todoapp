@@ -18,7 +18,7 @@ class _FabState extends State<Fab> {
           Navigator.push(
             context,
             CupertinoPageRoute(
-              builder: (_) => const TaskView(),
+              builder: (_) => const TaskCreateView(),
             ),
           );
         },

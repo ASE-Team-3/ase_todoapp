@@ -62,7 +62,7 @@ class TaskDetailView extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TaskView(task: task),
+                  builder: (context) => TaskCreateView(task: task),
                 ),
               );
             },
