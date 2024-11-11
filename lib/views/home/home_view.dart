@@ -68,7 +68,7 @@ class _HomeViewState extends State<HomeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'View Tasks By:',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
