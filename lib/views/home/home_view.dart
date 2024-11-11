@@ -1,6 +1,5 @@
 // views/home/home_view.dart
 import 'package:animate_do/animate_do.dart';
-import 'package:app/extensions/space_exs.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/utils/constrants.dart';
