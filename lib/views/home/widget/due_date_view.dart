@@ -1,8 +1,12 @@
 // views/home/widget/due_date_view.dart
+import 'package:app/utils/constrants.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/views/tasks/task_detail_view.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart'; // Ensure you have this dependency in pubspec.yaml
+import 'package:animate_do/animate_do.dart'; // Ensure you have this dependency in pubspec.yaml
+import 'package:app/utils/app_str.dart';
 
 class DueDateView extends StatelessWidget {
   final List<Task> tasks;
@@ -14,7 +18,7 @@ class DueDateView extends StatelessWidget {
     tasks.sort((a, b) => a.deadline.compareTo(b.deadline));
 
     final today = DateTime.now();
-    final tomorrow = today.add(Duration(days: 1));
+    final tomorrow = today.add(const Duration(days: 1));
 
     final todayTasks =
         tasks.where((task) => _isSameDay(task.deadline, today)).toList();
@@ -23,16 +27,23 @@ class DueDateView extends StatelessWidget {
     final upcomingTasks =
         tasks.where((task) => task.deadline.isAfter(tomorrow)).toList();
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: [
-        _buildDateSection(context, 'Today', todayTasks, Colors.blue.shade50),
-        _buildDateSection(
-            context, 'Tomorrow', tomorrowTasks, Colors.green.shade50),
-        _buildDateSection(
-            context, 'Upcoming', upcomingTasks, Colors.orange.shade50),
-      ],
-    );
+    final hasTasks = todayTasks.isNotEmpty ||
+        tomorrowTasks.isNotEmpty ||
+        upcomingTasks.isNotEmpty;
+
+    return hasTasks
+        ? ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              _buildDateSection(
+                  context, 'Today', todayTasks, Colors.blue.shade50),
+              _buildDateSection(
+                  context, 'Tomorrow', tomorrowTasks, Colors.green.shade50),
+              _buildDateSection(
+                  context, 'Upcoming', upcomingTasks, Colors.orange.shade50),
+            ],
+          )
+        : _buildEmptyState(Theme.of(context).textTheme);
   }
 
   Widget _buildDateSection(BuildContext context, String title, List<Task> tasks,
@@ -113,9 +124,31 @@ class DueDateView extends StatelessWidget {
             ],
           ),
           trailing: task.isCompleted
-              ? Icon(Icons.check_circle, color: Colors.green)
+              ? const Icon(Icons.check_circle, color: Colors.green)
               : null,
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(TextTheme textTheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FadeIn(
+            child: SizedBox(
+              width: 200,
+              height: 200,
+              child: Lottie.asset(lottieURL,
+                  animate: true), // Use the correct asset path
+            ),
+          ),
+          FadeInUp(
+            from: 30,
+            child: Text(AppStr.doneAllTask, style: textTheme.headlineSmall),
+          ),
+        ],
       ),
     );
   }
