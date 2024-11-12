@@ -165,36 +165,64 @@ class _HomeViewState extends State<HomeView> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              value: Provider.of<TaskProvider>(context).tasks.isNotEmpty
-                  ? Provider.of<TaskProvider>(context).completedTasks /
-                      Provider.of<TaskProvider>(context).tasks.length
-                  : 0, // Handle empty list by setting to 0
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation(AppColors.primaryColor),
-            ),
-          ),
-          SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(AppStr.mainTitle, style: textTheme.headlineMedium),
-              SizedBox(height: 4),
-              Consumer<TaskProvider>(
-                builder: (context, taskProvider, _) {
-                  return Text(
-                    "${taskProvider.completedTasks} of ${taskProvider.tasks.length} Tasks Completed",
-                    style: textTheme.displaySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  );
-                },
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  value: Provider.of<TaskProvider>(context).tasks.isNotEmpty
+                      ? Provider.of<TaskProvider>(context).completedTasks /
+                          Provider.of<TaskProvider>(context).tasks.length
+                      : 0, // Handle empty list by setting to 0
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation(AppColors.primaryColor),
+                ),
+              ),
+              SizedBox(width: 20),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(AppStr.mainTitle, style: textTheme.headlineMedium),
+                  SizedBox(height: 4),
+                  Consumer<TaskProvider>(
+                    builder: (context, taskProvider, _) {
+                      return Text(
+                        "${taskProvider.completedTasks} of ${taskProvider.tasks.length} Tasks Completed",
+                        style: textTheme.displaySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
+          ),
+          // Display the total points
+          Consumer<TaskProvider>(
+            builder: (context, taskProvider, _) {
+              return Column(
+                children: [
+                  Text(
+                    "Reward Points",
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryColor,
+                    ),
+                  ),
+                  Text(
+                    "${taskProvider.totalPoints} pts",
+                    style: textTheme.headlineMedium?.copyWith(
+                      color: AppColors.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

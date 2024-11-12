@@ -1,5 +1,6 @@
 // providers/task_provider.dart
 import 'dart:developer';
+import 'package:app/models/points_history_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -8,15 +9,16 @@ import 'package:app/models/attachment.dart';
 
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
+  List<PointsHistoryEntry> pointsHistory = [];
 
   List<Task> get tasks => _tasks;
 
   // Computed property to count completed tasks
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
-  // Define points constants
-  static const int completedTaskPoints = 10;
-  static const int incompleteTaskDeduction = -5;
+  int _totalPoints = 0; // New property to track total points
+
+  int get totalPoints => _totalPoints; // Getter for UI access
 
   void addTask(Task task) {
     _tasks.add(task);
@@ -48,14 +50,17 @@ class TaskProvider extends ChangeNotifier {
     task.isCompleted = !task.isCompleted;
 
     if (task.isCompleted) {
-      // Award points if the task is completed
-      task.points += completedTaskPoints;
+      _totalPoints += task.points;
     } else {
-      // Deduct points if the task is incomplete
-      task.points += incompleteTaskDeduction;
+      _totalPoints -= task.points;
     }
 
+    _updatePointsHistory(); // Record each point change
     notifyListeners();
+  }
+
+  void _updatePointsHistory() {
+    pointsHistory.add(PointsHistoryEntry(DateTime.now(), _totalPoints));
   }
 
   // Remove a task
