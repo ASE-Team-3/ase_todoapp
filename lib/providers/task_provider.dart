@@ -14,7 +14,10 @@ class TaskProvider extends ChangeNotifier {
   // Computed property to count completed tasks
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
-  // Add a new task
+  // Define points constants
+  static const int completedTaskPoints = 10;
+  static const int incompleteTaskDeduction = -5;
+
   void addTask(Task task) {
     _tasks.add(task);
     notifyListeners();
@@ -40,9 +43,18 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // Toggle task completion status
+  // Toggle task completion and update points
   void toggleTaskCompletion(Task task) {
     task.isCompleted = !task.isCompleted;
+
+    if (task.isCompleted) {
+      // Award points if the task is completed
+      task.points += completedTaskPoints;
+    } else {
+      // Deduct points if the task is incomplete
+      task.points += incompleteTaskDeduction;
+    }
+
     notifyListeners();
   }
 

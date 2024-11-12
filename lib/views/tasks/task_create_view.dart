@@ -9,6 +9,7 @@ import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For input formatters
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/task.dart';
@@ -28,8 +29,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController titleTaskController = TextEditingController();
   final TextEditingController descriptionTaskController =
       TextEditingController();
+  final TextEditingController pointsController =
+      TextEditingController(); // Points controller
   DateTime? selectedDeadline;
   List<Attachment> attachments = [];
+  int lastValidPoints = 0; // Store the last valid points value
 
   @override
   void initState() {
@@ -40,6 +44,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       descriptionTaskController.text = widget.task!.description;
       selectedDeadline = widget.task!.deadline;
       attachments = List.from(widget.task!.attachments);
+      pointsController.text = widget.task!.points.toString();
+      lastValidPoints = widget.task!.points; // Set initial points as valid
     }
   }
 
@@ -94,6 +100,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }
 
   void _saveOrUpdateTask() {
+    final enteredPoints = int.tryParse(pointsController.text) ?? 0;
+
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         selectedDeadline != null) {
@@ -107,6 +115,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           description: descriptionTaskController.text,
           deadline: selectedDeadline!,
           attachments: attachments,
+          points: enteredPoints, // Set custom points
         );
         taskProvider.addTask(newTask);
       } else {
@@ -116,6 +125,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           description: descriptionTaskController.text,
           deadline: selectedDeadline!,
           attachments: attachments,
+          points: enteredPoints, // Update custom points
         );
         taskProvider.updateTask(updatedTask);
       }
@@ -123,6 +133,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       // Clear fields and close the view
       titleTaskController.clear();
       descriptionTaskController.clear();
+      pointsController.clear();
       setState(() {
         selectedDeadline = null;
         attachments.clear();
@@ -206,11 +217,56 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             hintText: AppStr.placeholderDescription,
           ),
           const SizedBox(height: 16),
-          // Use DateTimeSelectionWidget for deadline date
+          // Points input field with validation and feedback
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: pointsController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Assign Points (1 - 100)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    int parsedValue = int.tryParse(value) ?? lastValidPoints;
+                    if (parsedValue > 100) {
+                      pointsController.text = lastValidPoints.toString();
+                      pointsController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: pointsController.text.length));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Points cannot exceed 100.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } else {
+                      lastValidPoints = parsedValue;
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Current Points: ${pointsController.text.isEmpty ? 0 : pointsController.text} points",
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Date selection widget
           DateTimeSelectionWidget(
             title: selectedDeadline != null
-                ? "${selectedDeadline!.toLocal()}"
-                    .split(' ')[0] // Display the date
+                ? "${selectedDeadline!.toLocal()}".split(' ')[0]
                 : 'Select Date',
             onTap: () {
               DatePicker.showDatePicker(context, onConfirm: (date) {
@@ -227,10 +283,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           const SizedBox(height: 16),
-          // Use DateTimeSelectionWidget for deadline time
+          // Time selection widget
           DateTimeSelectionWidget(
             title: selectedDeadline != null
-                ? "${selectedDeadline!.hour}:${selectedDeadline!.minute}" // Display the time
+                ? "${selectedDeadline!.hour}:${selectedDeadline!.minute}"
                 : 'Select Time',
             onTap: () {
               DatePicker.showTimePicker(context, onChanged: (_) {},
@@ -404,6 +460,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   void dispose() {
     titleTaskController.dispose();
     descriptionTaskController.dispose();
+    pointsController.dispose();
     super.dispose();
   }
 }

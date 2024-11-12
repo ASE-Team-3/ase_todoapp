@@ -7,28 +7,30 @@ class Task {
   final String id; // UUID
   final String title;
   final String description;
-  final DateTime deadline; // Keep the original deadline property
+  final DateTime deadline;
   final DateTime creationDate;
   final int
       priority; // New priority field (1 for high, 2 for medium, 3 for low)
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
+  int points; // New points attribute
 
   Task({
     required this.title,
     required this.description,
-    required this.deadline, // Retain the deadline field
-    this.priority = 2, // Default priority (medium)
+    required this.deadline,
+    this.priority = 2,
     DateTime? creationDate,
-    String? id, // Nullable parameter for UUID
+    String? id,
     this.isCompleted = false,
     List<Attachment>? attachments,
-    List<SubTask>? subTasks, // Optional list of sub-tasks
-  })  : id = id ?? const Uuid().v4(), // Generate a new UUID if none is provided
+    List<SubTask>? subTasks,
+    this.points = 0, // Initialize points to 0
+  })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now(),
         attachments = attachments ?? [],
-        subTasks = subTasks ?? []; // Initialize sub-tasks list
+        subTasks = subTasks ?? [];
 
   Task copyWith({
     String? id,
@@ -36,21 +38,23 @@ class Task {
     String? description,
     DateTime? deadline,
     DateTime? creationDate,
-    int? priority, // Include priority in copyWith
+    int? priority,
     List<Attachment>? attachments,
     bool? isCompleted,
     List<SubTask>? subTasks,
+    int? points, // Add points in copyWith
   }) {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
-      deadline: deadline ?? this.deadline, // Retain the deadline parameter
+      deadline: deadline ?? this.deadline,
       creationDate: creationDate ?? this.creationDate,
-      priority: priority ?? this.priority, // Set the new priority field
+      priority: priority ?? this.priority,
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
+      points: points ?? this.points, // Update points
     );
   }
 }
