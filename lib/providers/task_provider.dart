@@ -9,7 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   TaskProvider() {
     _initializeNotifications();
@@ -23,10 +23,11 @@ class TaskProvider extends ChangeNotifier {
   void _initializeNotifications() {
     log('Initializing notifications...'); // Debug log
     const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('icon'); // Ensure icon.png exists in res/drawable folder
+        AndroidInitializationSettings(
+            'icon'); // Ensure icon.png exists in res/drawable folder
 
     const InitializationSettings initializationSettings =
-    InitializationSettings(android: initializationSettingsAndroid);
+        InitializationSettings(android: initializationSettingsAndroid);
 
     flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
@@ -41,16 +42,15 @@ class TaskProvider extends ChangeNotifier {
     log('Attempting to send notification: $title - $body'); // Debug log
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
-        'channel_id', 'channel_name',
-        channelDescription: 'Task Notifications',
-        importance: Importance.max,
-        priority: Priority.high,
-        icon: 'icon', // Use the icon from the drawable folder
-        showWhen: true);
+        AndroidNotificationDetails('channel_id', 'channel_name',
+            channelDescription: 'Task Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: 'icon', // Use the icon from the drawable folder
+            showWhen: true);
 
     const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
+        NotificationDetails(android: androidPlatformChannelSpecifics);
 
     try {
       await flutterLocalNotificationsPlugin.show(
@@ -116,7 +116,7 @@ class TaskProvider extends ChangeNotifier {
   // Add a sub-task to a task
   void addSubTask(String taskId, SubTask subTask) {
     Task task = _tasks.firstWhere(
-          (t) => t.id == taskId,
+      (t) => t.id == taskId,
       orElse: () => throw Exception('Task with ID $taskId not found'),
     );
 
