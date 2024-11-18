@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app/utils/deadline_utils.dart'; // Import deadline utils
 
 class FlexibleDeadlineDropdown extends StatefulWidget {
   final String? flexibleDeadline;
@@ -42,24 +43,20 @@ class _FlexibleDeadlineDropdownState extends State<FlexibleDeadlineDropdown> {
                   borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
               ),
+              // Generate items dynamically from the predefinedDeadlines map
               items: [
-                DropdownMenuItem(
-                  value: "Today",
-                  child: const Text(
-                    "Today",
-                    style: TextStyle(color: Colors.black),
+                ...predefinedDeadlines.keys.map(
+                  (option) => DropdownMenuItem<String>(
+                    value: option,
+                    child: Text(
+                      option,
+                      style: const TextStyle(color: Colors.black),
+                    ),
                   ),
                 ),
-                DropdownMenuItem(
-                  value: "This Week",
-                  child: const Text(
-                    "This Week",
-                    style: TextStyle(color: Colors.black),
-                  ),
-                ),
-                DropdownMenuItem(
+                const DropdownMenuItem<String>(
                   value: "Specific Deadline",
-                  child: const Text(
+                  child: Text(
                     "Specific Deadline",
                     style: TextStyle(color: Colors.black),
                   ),
@@ -68,9 +65,15 @@ class _FlexibleDeadlineDropdownState extends State<FlexibleDeadlineDropdown> {
               onChanged: (value) {
                 setState(() {
                   widget.onFlexibleDeadlineChanged(value);
-                  if (value != "Specific Deadline") {
-                    selectedSpecificDeadline = null; // Reset specific deadline
+                  if (value == "Specific Deadline") {
+                    // Reset previous values and show specific deadline picker
+                    selectedSpecificDeadline = null;
                     widget.onSpecificDeadlineSelected(null);
+                  } else {
+                    // Calculate a flexible deadline if it's a predefined option
+                    selectedSpecificDeadline =
+                        calculateDeadlineFromFlexible(value!);
+                    widget.onSpecificDeadlineSelected(selectedSpecificDeadline);
                   }
                 });
               },
