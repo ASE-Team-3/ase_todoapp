@@ -9,7 +9,7 @@ import 'package:app/views/tasks/task_create_view.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:app/views/tasks/subtasks/subtask_view.dart';
-import 'package:app/utils/app_colors.dart'; // Assuming AppColors.primaryColor is defined here
+import 'package:app/utils/app_colors.dart';
 
 class TaskDetailView extends StatelessWidget {
   final String taskId;
@@ -42,7 +42,7 @@ class TaskDetailView extends StatelessWidget {
     );
 
     final formattedDeadline =
-        DateFormat.yMMMd().add_jm().format(task.deadline.toLocal());
+        DateFormat.yMMMd().add_jm().format(task.deadline!.toLocal());
     final formattedCreationDate =
         DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
 

@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:app/utils/deadline_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -67,17 +68,44 @@ class TaskProvider extends ChangeNotifier {
 
   // Add a new task
   void addTask(Task task) {
+    if (task.flexibleDeadline != null && task.deadline == null) {
+      task = task.copyWith(
+          deadline: calculateDeadlineFromFlexible(task.flexibleDeadline!));
+    }
     _tasks.add(task);
     notifyListeners();
   }
 
-  void updateTask(Task updatedTask) {
-    int index = _tasks.indexWhere((task) => task.id == updatedTask.id);
+  void updateTask(
+    Task task, {
+    required String title,
+    required String description,
+    DateTime? selectedDeadline,
+    String? flexibleDeadline,
+    List<Attachment>? attachments,
+  }) {
+    // Calculate deadline if flexibleDeadline is provided and selectedDeadline is null
+    final DateTime? calculatedDeadline = selectedDeadline ??
+        (flexibleDeadline != null
+            ? calculateDeadlineFromFlexible(flexibleDeadline)
+            : null);
+
+    final updatedTask = task.copyWith(
+      title: title,
+      description: description,
+      deadline: calculatedDeadline, // Final deadline
+      flexibleDeadline: flexibleDeadline,
+      attachments: attachments ?? task.attachments,
+    );
+
+    // Update the task in the list
+    int index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
+      log('Task updated: ${updatedTask.title}');
       notifyListeners();
     } else {
-      throw Exception('Task with ID ${updatedTask.id} not found');
+      log('Task with ID ${task.id} not found for update.');
     }
   }
 

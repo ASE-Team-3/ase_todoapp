@@ -125,7 +125,7 @@ class PriorityView extends StatelessWidget {
                 ),
               const SizedBox(height: 6),
               Text(
-                "Due: ${_formatDate(task.deadline)}",
+                "Due: ${_formatDate(task.deadline!)}",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[600],
                     ),

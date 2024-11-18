@@ -7,7 +7,9 @@ class Task {
   final String id; // UUID
   final String title;
   final String description;
-  final DateTime deadline; // Keep the original deadline property
+  final DateTime? deadline; // Specific deadline
+  final String?
+      flexibleDeadline; // Flexible deadline (e.g., "Today", "This Week")
   final DateTime creationDate;
   final int
       priority; // New priority field (1 for high, 2 for medium, 3 for low)
@@ -18,7 +20,8 @@ class Task {
   Task({
     required this.title,
     required this.description,
-    required this.deadline, // Retain the deadline field
+    this.deadline, // Retain the deadline field
+    this.flexibleDeadline,
     this.priority = 2, // Default priority (medium)
     DateTime? creationDate,
     String? id, // Nullable parameter for UUID
@@ -35,6 +38,7 @@ class Task {
     String? title,
     String? description,
     DateTime? deadline,
+    String? flexibleDeadline,
     DateTime? creationDate,
     int? priority, // Include priority in copyWith
     List<Attachment>? attachments,
@@ -46,6 +50,7 @@ class Task {
       title: title ?? this.title,
       description: description ?? this.description,
       deadline: deadline ?? this.deadline, // Retain the deadline parameter
+      flexibleDeadline: flexibleDeadline ?? this.flexibleDeadline,
       creationDate: creationDate ?? this.creationDate,
       priority: priority ?? this.priority, // Set the new priority field
       attachments: attachments ?? this.attachments,

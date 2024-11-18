@@ -3,8 +3,10 @@ import 'dart:developer';
 import 'package:app/models/attachment.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
+import 'package:app/utils/deadline_utils.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
+import 'package:app/views/tasks/components/flexible_deadline_dropdown.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
@@ -29,6 +31,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController descriptionTaskController =
       TextEditingController();
   DateTime? selectedDeadline;
+  String? flexibleDeadline;
   List<Attachment> attachments = [];
 
   @override
@@ -96,7 +99,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   void _saveOrUpdateTask() {
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
-        selectedDeadline != null) {
+        (selectedDeadline != null || flexibleDeadline != null)) {
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       if (widget.task == null) {
@@ -105,19 +108,23 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          deadline: selectedDeadline!,
+          deadline: selectedDeadline, // Set the selected deadline
+          flexibleDeadline:
+              flexibleDeadline, // Store the flexibleDeadline if set
           attachments: attachments,
         );
         taskProvider.addTask(newTask);
       } else {
         // Updating an existing task
-        final updatedTask = widget.task!.copyWith(
+        // Pass selectedDeadline and flexibleDeadline to the provider
+        taskProvider.updateTask(
+          widget.task!,
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          deadline: selectedDeadline!,
+          selectedDeadline: selectedDeadline,
+          flexibleDeadline: flexibleDeadline,
           attachments: attachments,
         );
-        taskProvider.updateTask(updatedTask);
       }
 
       // Clear fields and close the view
@@ -126,6 +133,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       setState(() {
         selectedDeadline = null;
         attachments.clear();
+        flexibleDeadline = null;
       });
       Navigator.pop(context);
     } else {
@@ -222,6 +230,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                     selectedDeadline?.hour ?? 0,
                     selectedDeadline?.minute ?? 0,
                   );
+                  flexibleDeadline = null;
                 });
               });
             },
@@ -247,7 +256,19 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   } else {
                     selectedDeadline = time;
                   }
+                  flexibleDeadline = null;
                 });
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          // Use DropdownButton for flexible deadline
+          FlexibleDeadlineDropdown(
+            flexibleDeadline: flexibleDeadline,
+            onChanged: (value) {
+              setState(() {
+                flexibleDeadline = value;
+                selectedDeadline = null; // Reset specific deadline
               });
             },
           ),

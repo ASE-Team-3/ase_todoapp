@@ -69,7 +69,7 @@ class TaskWidget extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Due: ${_formatDate(task.deadline)}",
+                    "Due: ${_formatDate(task.deadline!)}",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey.shade600,
                         ),
