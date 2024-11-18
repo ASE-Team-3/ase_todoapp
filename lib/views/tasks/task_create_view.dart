@@ -116,7 +116,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         taskProvider.addTask(newTask);
       } else {
         // Updating an existing task
-        // Pass selectedDeadline and flexibleDeadline to the provider
         taskProvider.updateTask(
           widget.task!,
           title: titleTaskController.text,
@@ -192,7 +191,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Main task creation form
   Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
     return SingleChildScrollView(
       child: Column(
@@ -214,64 +212,69 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             hintText: AppStr.placeholderDescription,
           ),
           const SizedBox(height: 16),
-          // Use DateTimeSelectionWidget for deadline date
-          DateTimeSelectionWidget(
-            title: selectedDeadline != null
-                ? "${selectedDeadline!.toLocal()}"
-                    .split(' ')[0] // Display the date
-                : 'Select Date',
-            onTap: () {
-              DatePicker.showDatePicker(context, onConfirm: (date) {
-                setState(() {
-                  selectedDeadline = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    selectedDeadline?.hour ?? 0,
-                    selectedDeadline?.minute ?? 0,
-                  );
-                  flexibleDeadline = null;
-                });
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          // Use DateTimeSelectionWidget for deadline time
-          DateTimeSelectionWidget(
-            title: selectedDeadline != null
-                ? "${selectedDeadline!.hour}:${selectedDeadline!.minute}" // Display the time
-                : 'Select Time',
-            onTap: () {
-              DatePicker.showTimePicker(context, onChanged: (_) {},
-                  onConfirm: (time) {
-                setState(() {
-                  if (selectedDeadline != null) {
-                    selectedDeadline = DateTime(
-                      selectedDeadline!.year,
-                      selectedDeadline!.month,
-                      selectedDeadline!.day,
-                      time.hour,
-                      time.minute,
-                    );
-                  } else {
-                    selectedDeadline = time;
-                  }
-                  flexibleDeadline = null;
-                });
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          // Use DropdownButton for flexible deadline
+          // Dropdown for flexible deadline
           FlexibleDeadlineDropdown(
             flexibleDeadline: flexibleDeadline,
-            onChanged: (value) {
+            onFlexibleDeadlineChanged: (value) {
               setState(() {
                 flexibleDeadline = value;
-                selectedDeadline = null; // Reset specific deadline
+                if (value != "Specific Deadline") {
+                  selectedDeadline = null; // Reset specific deadline
+                }
+              });
+            },
+            onSpecificDeadlineSelected: (date) {
+              setState(() {
+                selectedDeadline = date; // Update the specific deadline
               });
             },
           ),
+          if (flexibleDeadline == "Specific Deadline") ...[
+            const SizedBox(height: 16),
+            // Select Date
+            DateTimeSelectionWidget(
+              title: selectedDeadline != null
+                  ? "${selectedDeadline!.toLocal()}".split(' ')[0]
+                  : 'Select Date',
+              onTap: () {
+                DatePicker.showDatePicker(context, onConfirm: (date) {
+                  setState(() {
+                    selectedDeadline = DateTime(
+                      date.year,
+                      date.month,
+                      date.day,
+                      selectedDeadline?.hour ?? 0,
+                      selectedDeadline?.minute ?? 0,
+                    );
+                  });
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            // Select Time
+            DateTimeSelectionWidget(
+              title: selectedDeadline != null
+                  ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
+                  : 'Select Time',
+              onTap: () {
+                DatePicker.showTimePicker(context, onConfirm: (time) {
+                  setState(() {
+                    if (selectedDeadline != null) {
+                      selectedDeadline = DateTime(
+                        selectedDeadline!.year,
+                        selectedDeadline!.month,
+                        selectedDeadline!.day,
+                        time.hour,
+                        time.minute,
+                      );
+                    } else {
+                      selectedDeadline = time;
+                    }
+                  });
+                });
+              },
+            ),
+          ],
         ],
       ),
     );
