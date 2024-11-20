@@ -120,44 +120,122 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           isRepeating: isRepeating,
           repeatInterval: repeatInterval,
           customRepeatDays: customRepeatDays,
-          nextOccurrence:
-              _calculateNextOccurrence(), // Calculate next occurrence
+          nextOccurrence: _calculateNextOccurrence(),
           attachments: attachments,
         );
         taskProvider.addTask(newTask);
+        Navigator.pop(context);
       } else {
         // Updating an existing task
-        taskProvider.updateTask(
-          widget.task!,
-          title: titleTaskController.text,
-          description: descriptionTaskController.text,
-          selectedDeadline: selectedDeadline,
-          flexibleDeadline: flexibleDeadline,
-          isRepeating: isRepeating,
-          repeatInterval: repeatInterval,
-          customRepeatDays: customRepeatDays,
-          attachments: attachments,
-        );
+        if (widget.task!.isRepeating) {
+          _showUpdateOptionsDialog(taskProvider); // Show update options dialog
+        } else {
+          // Normal update for non-repeating tasks
+          taskProvider.updateTask(
+            widget.task!,
+            title: titleTaskController.text,
+            description: descriptionTaskController.text,
+            selectedDeadline: selectedDeadline,
+            flexibleDeadline: flexibleDeadline,
+            isRepeating: isRepeating,
+            repeatInterval: repeatInterval,
+            customRepeatDays: customRepeatDays,
+            attachments: attachments,
+          );
+          _resetFields();
+          Navigator.pop(context);
+        }
       }
-
-      // Clear fields and close the view
-      titleTaskController.clear();
-      descriptionTaskController.clear();
-      setState(() {
-        selectedDeadline = null;
-        attachments.clear();
-        flexibleDeadline = null;
-        isRepeating = false;
-        repeatInterval = null;
-        customRepeatDays = null;
-        nextOccurrence = null;
-      });
-      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields.')),
       );
     }
+  }
+
+  Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Update Repeating Task"),
+          content: const Text(
+            "How would you like to update this repeating task?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Update all repeating tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "all",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("Update All"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Update this task and all subsequent tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "this_and_following",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("This and Following"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Update only this specific task occurrence
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "only_this",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("Only This"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Reset fields after adding/updating a task
+  void _resetFields() {
+    titleTaskController.clear();
+    descriptionTaskController.clear();
+    setState(() {
+      selectedDeadline = null;
+      attachments.clear();
+      flexibleDeadline = null;
+      isRepeating = false;
+      repeatInterval = null;
+      customRepeatDays = null;
+      nextOccurrence = null;
+    });
   }
 
   /// Calculate the next occurrence based on repeat settings

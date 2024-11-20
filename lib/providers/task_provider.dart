@@ -72,12 +72,16 @@ class TaskProvider extends ChangeNotifier {
   void addTask(Task task) {
     if (task.flexibleDeadline != null && task.deadline == null) {
       task = task.copyWith(
-          deadline: calculateDeadlineFromFlexible(task.flexibleDeadline!));
+        deadline: calculateDeadlineFromFlexible(task.flexibleDeadline!),
+      );
     }
 
-    // If repeating, generate occurrences as new tasks with individual deadlines
     if (task.isRepeating) {
-      _generateRepeatingTasks(task);
+      // Generate a group ID for all repeating tasks
+      final repeatingGroupId = const Uuid().v4();
+      final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
+
+      _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
       _tasks.add(task);
     }
@@ -85,6 +89,7 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Update a task
   void updateTask(
     Task task, {
     required String title,
@@ -96,7 +101,6 @@ class TaskProvider extends ChangeNotifier {
     int? customRepeatDays,
     List<Attachment>? attachments,
   }) {
-    // Calculate deadline if flexibleDeadline is provided and selectedDeadline is null
     final DateTime? calculatedDeadline = selectedDeadline ??
         (flexibleDeadline != null
             ? calculateDeadlineFromFlexible(flexibleDeadline)
@@ -113,14 +117,12 @@ class TaskProvider extends ChangeNotifier {
       attachments: attachments ?? task.attachments,
     );
 
-    // Update task in the list
     int index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
 
-      // If repeating, regenerate occurrences
       if (updatedTask.isRepeating) {
-        _generateRepeatingTasks(updatedTask);
+        _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
       }
 
       notifyListeners();
@@ -129,21 +131,24 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // Generate repeating tasks as new tasks with deadlines
-  void _generateRepeatingTasks(Task task) {
+// Updated _generateRepeatingTasks to accept a limit parameter
+  void _generateRepeatingTasks(Task task, String? groupId, {DateTime? limit}) {
     if (!task.isRepeating || task.repeatInterval == null) return;
 
     final DateTime now = DateTime.now();
-    final DateTime twoYearsLater = now.add(const Duration(days: 365 * 2));
+    final DateTime defaultLimit =
+        now.add(const Duration(days: 730)); // Default: 2 years
+    final DateTime generationLimit = limit ?? defaultLimit;
 
     DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
-    while (nextOccurrence != null && nextOccurrence.isBefore(twoYearsLater)) {
+    while (nextOccurrence != null && nextOccurrence.isBefore(generationLimit)) {
       // Create a new task for each occurrence with its unique deadline
       final newTask = task.copyWith(
         id: const Uuid().v4(),
         isCompleted: false, // Reset completion status
         deadline: nextOccurrence,
-        nextOccurrence: null, // Only the original task needs `nextOccurrence`
+        repeatingGroupId: groupId, // Ensure groupId is consistent
+        nextOccurrence: null, // Only the original task has `nextOccurrence`
       );
 
       _tasks.add(newTask);
@@ -156,39 +161,153 @@ class TaskProvider extends ChangeNotifier {
       );
     }
 
-    log('Generated repeating tasks for: ${task.title}');
+    log('Extended repeating tasks for: ${task.title}');
+  }
+
+  void updateRepeatingTasks(
+    Task task, {
+    required String option, // "all", "this_and_following", "only_this"
+    required String title,
+    required String description,
+    DateTime? selectedDeadline, // New specific deadline
+    String? flexibleDeadline, // New flexible deadline
+    String? repeatInterval, // New repeat interval (e.g., "daily", "monthly")
+    int? customRepeatDays, // Custom interval days
+  }) {
+    final groupId = task.repeatingGroupId;
+    if (groupId == null) return;
+
+    if (option == "all") {
+      // Update all tasks with the same repeating groupId
+      final firstTask = _tasks.firstWhere((t) => t.id == task.id);
+      DateTime baseDeadline = selectedDeadline ??
+          calculateDeadlineFromFlexible(flexibleDeadline!) ??
+          firstTask.deadline!;
+
+      for (int i = 0; i < _tasks.length; i++) {
+        if (_tasks[i].repeatingGroupId == groupId) {
+          final taskIndex = i;
+          _tasks[taskIndex] = _tasks[taskIndex].copyWith(
+            title: title,
+            description: description,
+            deadline: _calculateDynamicDeadline(
+              startDate: baseDeadline,
+              interval: repeatInterval ?? task.repeatInterval,
+              customDays: customRepeatDays ?? task.customRepeatDays,
+              iteration:
+                  taskIndex, // Adjust iteration for dynamic recalculation
+            ),
+            repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
+            customRepeatDays: customRepeatDays,
+            flexibleDeadline: flexibleDeadline,
+          );
+        }
+      }
+    } else if (option == "this_and_following") {
+      // Update this and all subsequent tasks
+      bool update = false;
+      DateTime baseDeadline = selectedDeadline ??
+          calculateDeadlineFromFlexible(flexibleDeadline!) ??
+          task.deadline!;
+
+      for (int i = 0; i < _tasks.length; i++) {
+        if (_tasks[i].id == task.id) {
+          update = true;
+        }
+
+        if (update && _tasks[i].repeatingGroupId == groupId) {
+          final taskIndex = i;
+          final iterationOffset =
+              taskIndex - _tasks.indexWhere((t) => t.id == task.id);
+          _tasks[taskIndex] = _tasks[taskIndex].copyWith(
+            title: title,
+            description: description,
+            deadline: _calculateDynamicDeadline(
+              startDate: baseDeadline,
+              interval: repeatInterval ?? task.repeatInterval,
+              customDays: customRepeatDays ?? task.customRepeatDays,
+              iteration: iterationOffset,
+            ),
+            repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
+            customRepeatDays: customRepeatDays,
+            flexibleDeadline: flexibleDeadline,
+          );
+        }
+      }
+    } else if (option == "only_this") {
+      // Update only this specific task
+      int index = _tasks.indexWhere((t) => t.id == task.id);
+      if (index != -1) {
+        _tasks[index] = _tasks[index].copyWith(
+          title: title,
+          description: description,
+          deadline: selectedDeadline ?? _tasks[index].deadline,
+          flexibleDeadline: flexibleDeadline ?? _tasks[index].flexibleDeadline,
+          repeatInterval: repeatInterval ?? _tasks[index].repeatInterval,
+          customRepeatDays: customRepeatDays ?? _tasks[index].customRepeatDays,
+        );
+      }
+    }
+
+    notifyListeners();
+  }
+
+  // Helper to calculate updated deadlines dynamically for repeating tasks
+  DateTime _calculateDynamicDeadline({
+    required DateTime startDate,
+    required String? interval,
+    required int? customDays,
+    required int iteration,
+  }) {
+    DateTime nextOccurrence = startDate;
+
+    for (int i = 0; i < iteration; i++) {
+      nextOccurrence = _calculateNextOccurrence(
+        interval: interval,
+        customDays: customDays,
+        lastOccurrence: nextOccurrence,
+      );
+    }
+
+    return nextOccurrence;
   }
 
   // Extend repeating tasks beyond the current 2-year limit
   void extendRepeatingTasks(Task task, int additionalYears) {
+    // Calculate the new end date based on the additional years
+    final DateTime currentLimit = task.deadline ?? DateTime.now();
     final DateTime newLimit =
-        DateTime.now().add(Duration(days: additionalYears * 365));
-    _generateRepeatingTasks(task.copyWith(
-        deadline: task.deadline?.add(Duration(days: 365 * additionalYears))));
+        currentLimit.add(Duration(days: additionalYears * 365));
+
+    // Regenerate tasks up to the new limit
+    _generateRepeatingTasks(
+      task.copyWith(deadline: task.deadline), // Use the original deadline
+      task.repeatingGroupId, // Ensure repeatingGroupId is preserved
+      limit: newLimit, // Pass the new limit for task generation
+    );
+
     notifyListeners();
   }
 
   // Handle overdue tasks by skipping or resetting deadlines
   void handleOverdueTask(Task task, bool skipToNext) {
     if (task.isRepeating && skipToNext) {
-      final DateTime? nextDeadline = _calculateNextOccurrence(
+      final DateTime nextDeadline = _calculateNextOccurrence(
         interval: task.repeatInterval,
         customDays: task.customRepeatDays,
         lastOccurrence: task.deadline ?? DateTime.now(),
       );
 
-      if (nextDeadline != null) {
-        updateTask(
-          task,
-          title: task.title,
-          description: task.description,
-          selectedDeadline: nextDeadline,
-          isRepeating: task.isRepeating,
-          repeatInterval: task.repeatInterval,
-        );
+      updateTask(
+        task,
+        title: task.title,
+        description: task.description,
+        selectedDeadline: nextDeadline,
+        isRepeating: task.isRepeating,
+        repeatInterval: task.repeatInterval,
+      );
 
-        log('Skipped overdue task: ${task.title}. New deadline: $nextDeadline');
-      }
+      log('Skipped overdue task: ${task.title}. New deadline: $nextDeadline');
     }
   }
 

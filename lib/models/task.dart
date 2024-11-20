@@ -16,6 +16,7 @@ class Task {
       repeatInterval; // "daily", "weekly", "monthly", "yearly", or "custom"
   final int? customRepeatDays; // Number of days for custom intervals
   final DateTime? nextOccurrence; // Next occurrence for repeating tasks
+  final String? repeatingGroupId; // Group ID for repeating tasks
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
@@ -30,6 +31,7 @@ class Task {
     this.repeatInterval,
     this.customRepeatDays,
     this.nextOccurrence,
+    this.repeatingGroupId, // Default null for non-repeating tasks
     DateTime? creationDate,
     String? id, // Nullable parameter for UUID
     this.isCompleted = false,
@@ -52,6 +54,7 @@ class Task {
     String? repeatInterval, // Include repeatInterval in copyWith
     int? customRepeatDays, // Include customRepeatDays in copyWith
     DateTime? nextOccurrence, // Include nextOccurrence in copyWith
+    String? repeatingGroupId, // Include repeatingGroupId in copyWith
     List<Attachment>? attachments,
     bool? isCompleted,
     List<SubTask>? subTasks,
@@ -71,6 +74,8 @@ class Task {
           customRepeatDays ?? this.customRepeatDays, // Update customRepeatDays
       nextOccurrence:
           nextOccurrence ?? this.nextOccurrence, // Update nextOccurrence
+      repeatingGroupId:
+          repeatingGroupId ?? this.repeatingGroupId, // Update repeatingGroupId
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
