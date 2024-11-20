@@ -5,9 +5,12 @@ import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/utils/deadline_utils.dart';
 import 'package:app/views/home/home_view.dart';
+import 'package:app/views/tasks/components/custom_interval_input.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
 import 'package:app/views/tasks/components/flexible_deadline_dropdown.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
+import 'package:app/views/tasks/components/repeat_interval_dropdown.dart';
+import 'package:app/views/tasks/components/repeating_toggle.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +36,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   DateTime? selectedDeadline;
   String? flexibleDeadline;
   List<Attachment> attachments = [];
+  bool isRepeating = false;
+  String? repeatInterval; // E.g., "daily", "weekly", etc.
+  int? customRepeatDays; // For custom intervals
+  DateTime? nextOccurrence; // Next occurrence of the repeating task
 
   @override
   void initState() {
@@ -108,9 +115,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          deadline: selectedDeadline, // Set the selected deadline
-          flexibleDeadline:
-              flexibleDeadline, // Store the flexibleDeadline if set
+          deadline: selectedDeadline,
+          flexibleDeadline: flexibleDeadline,
+          isRepeating: isRepeating,
+          repeatInterval: repeatInterval,
+          customRepeatDays: customRepeatDays,
+          nextOccurrence:
+              _calculateNextOccurrence(), // Calculate next occurrence
           attachments: attachments,
         );
         taskProvider.addTask(newTask);
@@ -122,6 +133,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           description: descriptionTaskController.text,
           selectedDeadline: selectedDeadline,
           flexibleDeadline: flexibleDeadline,
+          isRepeating: isRepeating,
+          repeatInterval: repeatInterval,
+          customRepeatDays: customRepeatDays,
           attachments: attachments,
         );
       }
@@ -133,6 +147,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         selectedDeadline = null;
         attachments.clear();
         flexibleDeadline = null;
+        isRepeating = false;
+        repeatInterval = null;
+        customRepeatDays = null;
+        nextOccurrence = null;
       });
       Navigator.pop(context);
     } else {
@@ -140,6 +158,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         const SnackBar(content: Text('Please fill in all fields.')),
       );
     }
+  }
+
+  /// Calculate the next occurrence based on repeat settings
+  DateTime? _calculateNextOccurrence() {
+    if (!isRepeating) return null;
+
+    final now = DateTime.now();
+    switch (repeatInterval) {
+      case "daily":
+        return now.add(const Duration(days: 1));
+      case "weekly":
+        return now.add(const Duration(days: 7));
+      case "monthly":
+        return DateTime(now.year, now.month + 1, now.day);
+      case "yearly":
+        return DateTime(now.year + 1, now.month, now.day);
+      case "custom":
+        if (customRepeatDays != null) {
+          return now.add(Duration(days: customRepeatDays!));
+        }
+        break;
+    }
+    return null;
   }
 
   void _deleteTask() {
@@ -212,7 +253,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             hintText: AppStr.placeholderDescription,
           ),
           const SizedBox(height: 16),
-          // Dropdown for flexible deadline
           FlexibleDeadlineDropdown(
             flexibleDeadline: flexibleDeadline,
             onFlexibleDeadlineChanged: (value) {
@@ -231,7 +271,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           ),
           if (flexibleDeadline == "Specific Deadline") ...[
             const SizedBox(height: 16),
-            // Select Date
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
@@ -251,7 +290,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
             const SizedBox(height: 16),
-            // Select Time
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
@@ -274,6 +312,14 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                 });
               },
             ),
+          ],
+          const SizedBox(height: 16),
+          _buildRepeatingToggle(textTheme),
+          if (isRepeating) ...[
+            const SizedBox(height: 16),
+            _buildRepeatIntervalDropdown(textTheme),
+            const SizedBox(height: 16),
+            _buildCustomIntervalInput(textTheme),
           ],
         ],
       ),
@@ -335,6 +381,50 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               .toList(),
         ),
       ],
+    );
+  }
+
+  Widget _buildRepeatIntervalDropdown(TextTheme textTheme) {
+    if (!isRepeating) return const SizedBox.shrink();
+
+    return RepeatIntervalDropdown(
+      repeatInterval: repeatInterval,
+      onChanged: (value) {
+        setState(() {
+          repeatInterval = value;
+          if (value != "custom") customRepeatDays = null; // Reset custom days
+        });
+      },
+    );
+  }
+
+  Widget _buildRepeatingToggle(TextTheme textTheme) {
+    return RepeatingToggle(
+      isRepeating: isRepeating,
+      onChanged: (value) {
+        setState(() {
+          isRepeating = value;
+          if (!value) {
+            repeatInterval = null;
+            customRepeatDays = null;
+            nextOccurrence = null;
+          }
+        });
+      },
+    );
+  }
+
+  Widget _buildCustomIntervalInput(TextTheme textTheme) {
+    if (!isRepeating || repeatInterval != "custom")
+      return const SizedBox.shrink();
+
+    return CustomIntervalInput(
+      customRepeatDays: customRepeatDays,
+      onChanged: (value) {
+        setState(() {
+          customRepeatDays = value;
+        });
+      },
     );
   }
 
