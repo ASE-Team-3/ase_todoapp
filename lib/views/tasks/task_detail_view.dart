@@ -1,3 +1,4 @@
+import 'package:app/views/home/home_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -23,14 +24,6 @@ class TaskDetailView extends StatelessWidget {
     final task = taskProvider.tasks.firstWhere(
       (t) => t.id == taskId,
       orElse: () {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Task not found. Redirecting to home.')),
-          );
-          Future.delayed(Duration(seconds: 2), () {
-            Navigator.popUntil(context, (route) => route.isFirst);
-          });
-        });
         return Task(
           id: taskId,
           title: 'Task Not Found',
@@ -65,6 +58,12 @@ class TaskDetailView extends StatelessWidget {
                   builder: (context) => TaskCreateView(task: task),
                 ),
               );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () {
+              showDeleteOptionsDialog(context, task);
             },
           ),
         ],
@@ -264,6 +263,73 @@ class TaskDetailView extends StatelessWidget {
       );
 
       taskProvider.addAttachment(taskId, newAttachment);
+    }
+  }
+
+  Future<void> showDeleteOptionsDialog(BuildContext context, Task task) async {
+    final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+
+    if (task.isRepeating) {
+      // Show the three-option dialog for repeating tasks
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Delete Repeating Task"),
+            content: const Text(
+              "How would you like to delete this repeating task?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  taskProvider.deleteRepeatingTasks(task, option: "all");
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                },
+                child: const Text("Delete All"),
+              ),
+              TextButton(
+                onPressed: () {
+                  taskProvider.deleteRepeatingTasks(task,
+                      option: "this_and_following");
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                },
+                child: const Text("This and Following"),
+              ),
+              TextButton(
+                onPressed: () {
+                  taskProvider.deleteRepeatingTasks(task, option: "only_this");
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                },
+                child: const Text("Only This"),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      // Show a Yes/No confirmation dialog for non-repeating tasks
+      await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Delete Task"),
+            content: const Text("Are you sure you want to delete this task?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false), // No
+                child: const Text("No"),
+              ),
+              TextButton(
+                onPressed: () {
+                  taskProvider.removeTask(task);
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                }, // Yes
+                child: const Text("Yes"),
+              ),
+            ],
+          );
+        },
+      );
     }
   }
 

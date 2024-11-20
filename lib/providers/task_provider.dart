@@ -271,6 +271,61 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
+  void deleteRepeatingTasks(Task task, {required String option}) {
+    switch (option) {
+      case "all":
+        _deleteAllRepeatingTasks(task);
+        break;
+      case "this_and_following":
+        _deleteThisAndFollowingTasks(task);
+        break;
+      case "only_this":
+        _deleteOnlyThisTask(task);
+        break;
+      default:
+        log('Unknown delete option: $option');
+    }
+    notifyListeners();
+  }
+
+// Delete all occurrences of the repeating task
+  void _deleteAllRepeatingTasks(Task task) {
+    final originalTaskId = task.id;
+    _tasks.removeWhere(
+        (t) => t.id == originalTaskId || _isGeneratedFromTask(t, task));
+    log('Deleted all occurrences of repeating task: ${task.title}');
+  }
+
+// Delete this task and all subsequent occurrences
+  void _deleteThisAndFollowingTasks(Task task) {
+    final taskIndex = _tasks.indexWhere((t) => t.id == task.id);
+    if (taskIndex != -1) {
+      final DateTime? startDeleteFrom = _tasks[taskIndex].deadline;
+      _tasks.removeWhere((t) =>
+          t.id == task.id ||
+          (_isGeneratedFromTask(t, task) &&
+              t.deadline != null &&
+              t.deadline!.isAfter(startDeleteFrom!)));
+      log('Deleted task: ${task.title} and all subsequent occurrences.');
+    } else {
+      log('Task not found for deletion: ${task.title}');
+    }
+  }
+
+// Delete only this specific task occurrence
+  void _deleteOnlyThisTask(Task task) {
+    _tasks.removeWhere((t) => t.id == task.id);
+    log('Deleted only this occurrence of task: ${task.title}');
+  }
+
+// Helper to check if a task is generated from the original task
+  bool _isGeneratedFromTask(Task generatedTask, Task originalTask) {
+    return generatedTask.title == originalTask.title &&
+        generatedTask.description == originalTask.description &&
+        generatedTask.isRepeating == true &&
+        generatedTask.repeatInterval == originalTask.repeatInterval;
+  }
+
   // Add a sub-task to a task
   void addSubTask(String taskId, SubTask subTask) {
     Task task = _tasks.firstWhere(
