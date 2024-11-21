@@ -102,7 +102,7 @@ class _CalendarViewState extends State<CalendarView> {
                                     ),
                           ),
                           subtitle: Text(
-                            "Due: ${_formatDate(task.deadline)}",
+                            "Due: ${_formatDate(task.deadline!)}",
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Colors.grey.shade600,

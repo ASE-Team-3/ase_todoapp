@@ -4,8 +4,12 @@ import 'package:app/models/attachment.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/views/home/home_view.dart';
+import 'package:app/views/tasks/components/custom_interval_input.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
+import 'package:app/views/tasks/components/flexible_deadline_dropdown.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
+import 'package:app/views/tasks/components/repeat_interval_dropdown.dart';
+import 'package:app/views/tasks/components/repeating_toggle.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -31,8 +35,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       TextEditingController();
   final TextEditingController pointsController = TextEditingController();
   DateTime? selectedDeadline;
+  String? flexibleDeadline;
   List<Attachment> attachments = [];
   int lastValidPoints = 0;
+  bool isRepeating = false;
+  String? repeatInterval; // E.g., "daily", "weekly", etc.
+  int? customRepeatDays; // For custom intervals
+  DateTime? nextOccurrence; // Next occurrence of the repeating task
 
   @override
   void initState() {
@@ -102,7 +111,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
-        selectedDeadline != null) {
+        (selectedDeadline != null || flexibleDeadline != null)) {
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       if (widget.task == null) {
@@ -110,35 +119,157 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          deadline: selectedDeadline!,
+          deadline: selectedDeadline,
+          flexibleDeadline: flexibleDeadline,
+          isRepeating: isRepeating,
+          repeatInterval: repeatInterval,
+          customRepeatDays: customRepeatDays,
+          nextOccurrence: _calculateNextOccurrence(),
           attachments: attachments,
           points: enteredPoints,
         );
         taskProvider.addTask(newTask);
+        Navigator.pop(context);
       } else {
-        final updatedTask = widget.task!.copyWith(
-          title: titleTaskController.text,
-          description: descriptionTaskController.text,
-          deadline: selectedDeadline!,
-          attachments: attachments,
-          points: enteredPoints,
-        );
-        taskProvider.updateTask(updatedTask);
+        // Updating an existing task
+        if (widget.task!.isRepeating) {
+          _showUpdateOptionsDialog(taskProvider); // Show update options dialog
+        } else {
+          // Normal update for non-repeating tasks
+          taskProvider.updateTask(
+            widget.task!,
+            title: titleTaskController.text,
+            description: descriptionTaskController.text,
+            selectedDeadline: selectedDeadline,
+            flexibleDeadline: flexibleDeadline,
+            isRepeating: isRepeating,
+            repeatInterval: repeatInterval,
+            customRepeatDays: customRepeatDays,
+            attachments: attachments,
+            points: enteredPoints,
+          );
+          _resetFields();
+          Navigator.pop(context);
+        }
       }
-
-      titleTaskController.clear();
-      descriptionTaskController.clear();
-      pointsController.clear();
-      setState(() {
-        selectedDeadline = null;
-        attachments.clear();
-      });
-      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
     }
+  }
+
+  Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
+    final enteredPoints = int.tryParse(pointsController.text) ?? 0;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Update Repeating Task"),
+          content: const Text(
+            "How would you like to update this repeating task?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Update all repeating tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "all",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("Update All"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Update this task and all subsequent tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "this_and_following",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("This and Following"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Update only this specific task occurrence
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "only_this",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
+                _resetFields();
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Exit to previous view
+              },
+              child: const Text("Only This"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Reset fields after adding/updating a task
+  void _resetFields() {
+    titleTaskController.clear();
+    descriptionTaskController.clear();
+    pointsController.clear;
+    setState(() {
+      selectedDeadline = null;
+      attachments.clear();
+      flexibleDeadline = null;
+      isRepeating = false;
+      repeatInterval = null;
+      customRepeatDays = null;
+      nextOccurrence = null;
+    });
+  }
+
+  /// Calculate the next occurrence based on repeat settings
+  DateTime? _calculateNextOccurrence() {
+    if (!isRepeating) return null;
+
+    final now = DateTime.now();
+    switch (repeatInterval) {
+      case "daily":
+        return now.add(const Duration(days: 1));
+      case "weekly":
+        return now.add(const Duration(days: 7));
+      case "monthly":
+        return DateTime(now.year, now.month + 1, now.day);
+      case "yearly":
+        return DateTime(now.year + 1, now.month, now.day);
+      case "custom":
+        if (customRepeatDays != null) {
+          return now.add(Duration(days: customRepeatDays!));
+        }
+        break;
+    }
+    return null;
   }
 
   void _deleteTask() {
@@ -255,48 +386,74 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             ),
           ),
           const SizedBox(height: 16),
-          DateTimeSelectionWidget(
-            title: selectedDeadline != null
-                ? "${selectedDeadline!.toLocal()}".split(' ')[0]
-                : AppStr.dateString,
-            onTap: () {
-              DatePicker.showDatePicker(context, onConfirm: (date) {
-                setState(() {
-                  selectedDeadline = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    selectedDeadline?.hour ?? 0,
-                    selectedDeadline?.minute ?? 0,
-                  );
-                });
+          FlexibleDeadlineDropdown(
+            flexibleDeadline: flexibleDeadline,
+            onFlexibleDeadlineChanged: (value) {
+              setState(() {
+                flexibleDeadline = value;
+                if (value != "Specific Deadline") {
+                  selectedDeadline = null; // Reset specific deadline
+                }
+              });
+            },
+            onSpecificDeadlineSelected: (date) {
+              setState(() {
+                selectedDeadline = date; // Update the specific deadline
               });
             },
           ),
-          const SizedBox(height: 16),
-          DateTimeSelectionWidget(
-            title: selectedDeadline != null
-                ? "${selectedDeadline!.hour}:${selectedDeadline!.minute}"
-                : AppStr.timeString,
-            onTap: () {
-              DatePicker.showTimePicker(context, onChanged: (_) {},
-                  onConfirm: (time) {
-                setState(() {
-                  if (selectedDeadline != null) {
+          if (flexibleDeadline == "Specific Deadline") ...[
+            const SizedBox(height: 16),
+            DateTimeSelectionWidget(
+              title: selectedDeadline != null
+                  ? "${selectedDeadline!.toLocal()}".split(' ')[0]
+                  : 'Select Date',
+              onTap: () {
+                DatePicker.showDatePicker(context, onConfirm: (date) {
+                  setState(() {
                     selectedDeadline = DateTime(
-                      selectedDeadline!.year,
-                      selectedDeadline!.month,
-                      selectedDeadline!.day,
-                      time.hour,
-                      time.minute,
+                      date.year,
+                      date.month,
+                      date.day,
+                      selectedDeadline?.hour ?? 0,
+                      selectedDeadline?.minute ?? 0,
                     );
-                  } else {
-                    selectedDeadline = time;
-                  }
+                  });
                 });
-              });
-            },
-          ),
+              },
+            ),
+            const SizedBox(height: 16),
+            DateTimeSelectionWidget(
+              title: selectedDeadline != null
+                  ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
+                  : 'Select Time',
+              onTap: () {
+                DatePicker.showTimePicker(context, onConfirm: (time) {
+                  setState(() {
+                    if (selectedDeadline != null) {
+                      selectedDeadline = DateTime(
+                        selectedDeadline!.year,
+                        selectedDeadline!.month,
+                        selectedDeadline!.day,
+                        time.hour,
+                        time.minute,
+                      );
+                    } else {
+                      selectedDeadline = time;
+                    }
+                  });
+                });
+              },
+            ),
+          ],
+          const SizedBox(height: 16),
+          _buildRepeatingToggle(textTheme),
+          if (isRepeating) ...[
+            const SizedBox(height: 16),
+            _buildRepeatIntervalDropdown(textTheme),
+            const SizedBox(height: 16),
+            _buildCustomIntervalInput(textTheme),
+          ],
         ],
       ),
     );
@@ -362,6 +519,51 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  Widget _buildRepeatIntervalDropdown(TextTheme textTheme) {
+    if (!isRepeating) return const SizedBox.shrink();
+
+    return RepeatIntervalDropdown(
+      repeatInterval: repeatInterval,
+      onChanged: (value) {
+        setState(() {
+          repeatInterval = value;
+          if (value != "custom") customRepeatDays = null; // Reset custom days
+        });
+      },
+    );
+  }
+
+  Widget _buildRepeatingToggle(TextTheme textTheme) {
+    return RepeatingToggle(
+      isRepeating: isRepeating,
+      onChanged: (value) {
+        setState(() {
+          isRepeating = value;
+          if (!value) {
+            repeatInterval = null;
+            customRepeatDays = null;
+            nextOccurrence = null;
+          }
+        });
+      },
+    );
+  }
+
+  Widget _buildCustomIntervalInput(TextTheme textTheme) {
+    if (!isRepeating || repeatInterval != "custom")
+      return const SizedBox.shrink();
+
+    return CustomIntervalInput(
+      customRepeatDays: customRepeatDays,
+      onChanged: (value) {
+        setState(() {
+          customRepeatDays = value;
+        });
+      },
+    );
+  }
+
+  // Individual attachment tile with delete option
   Widget _buildAttachmentTile(Attachment attachment) {
     return ListTile(
       leading: Icon(_getAttachmentIcon(attachment.type)),

@@ -15,17 +15,17 @@ class DueDateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    tasks.sort((a, b) => a.deadline.compareTo(b.deadline));
+    tasks.sort((a, b) => a.deadline!.compareTo(b.deadline!));
 
     final today = DateTime.now();
     final tomorrow = today.add(const Duration(days: 1));
 
     final todayTasks =
-        tasks.where((task) => _isSameDay(task.deadline, today)).toList();
+        tasks.where((task) => _isSameDay(task.deadline!, today)).toList();
     final tomorrowTasks =
-        tasks.where((task) => _isSameDay(task.deadline, tomorrow)).toList();
+        tasks.where((task) => _isSameDay(task.deadline!, tomorrow)).toList();
     final upcomingTasks =
-        tasks.where((task) => task.deadline.isAfter(tomorrow)).toList();
+        tasks.where((task) => task.deadline!.isAfter(tomorrow)).toList();
 
     final hasTasks = todayTasks.isNotEmpty ||
         tomorrowTasks.isNotEmpty ||
@@ -116,7 +116,7 @@ class DueDateView extends StatelessWidget {
                 ),
               const SizedBox(height: 6),
               Text(
-                "Due: ${_formatDate(task.deadline)}",
+                "Due: ${_formatDate(task.deadline!)}",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[600],
                     ),
