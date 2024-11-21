@@ -393,7 +393,11 @@ class TaskProvider extends ChangeNotifier {
   void deleteRepeatingTasks(Task task, {required String option}) {
     switch (option) {
       case "all":
-        _deleteAllRepeatingTasks(task);
+        if (task.repeatingGroupId != null) {
+          deleteTasksByGroupId(task.repeatingGroupId!);
+        } else {
+          log('Task does not have a repeatingGroupId: ${task.title}');
+        }
         break;
       case "this_and_following":
         _deleteThisAndFollowingTasks(task);
@@ -407,42 +411,58 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-// Delete all occurrences of the repeating task
-  void _deleteAllRepeatingTasks(Task task) {
-    final originalTaskId = task.id;
-    _tasks.removeWhere(
-        (t) => t.id == originalTaskId || _isGeneratedFromTask(t, task));
-    log('Deleted all occurrences of repeating task: ${task.title}');
-  }
-
-// Delete this task and all subsequent occurrences
+  // Delete this task and all subsequent occurrences
   void _deleteThisAndFollowingTasks(Task task) {
-    final taskIndex = _tasks.indexWhere((t) => t.id == task.id);
-    if (taskIndex != -1) {
-      final DateTime? startDeleteFrom = _tasks[taskIndex].deadline;
-      _tasks.removeWhere((t) =>
-          t.id == task.id ||
-          (_isGeneratedFromTask(t, task) &&
+    if (task.repeatingGroupId == null) {
+      log('Task does not have a repeatingGroupId: ${task.title}');
+      return;
+    }
+
+    final groupId = task.repeatingGroupId;
+    final taskDeadline = task.deadline;
+
+    if (taskDeadline == null) {
+      log('Task deadline is null: ${task.title}');
+      return;
+    }
+
+    // Find all tasks with the same groupId and deadlines after or equal to the current task's deadline
+    final tasksToDelete = _tasks.where((t) {
+      return t.repeatingGroupId == groupId &&
               t.deadline != null &&
-              t.deadline!.isAfter(startDeleteFrom!)));
-      log('Deleted task: ${task.title} and all subsequent occurrences.');
+              t.deadline!.isAfter(taskDeadline) ||
+          t.deadline!.isAtSameMomentAs(taskDeadline);
+    }).toList();
+
+    if (tasksToDelete.isNotEmpty) {
+      _tasks.removeWhere((t) => tasksToDelete.contains(t));
+      log('Deleted ${tasksToDelete.length} tasks in group $groupId from and after deadline $taskDeadline');
+      notifyListeners(); // Notify listeners about the update
     } else {
-      log('Task not found for deletion: ${task.title}');
+      log('No tasks found to delete for repeatingGroupId: $groupId starting from $taskDeadline');
     }
   }
 
-// Delete only this specific task occurrence
+  // Delete only this specific task occurrence
   void _deleteOnlyThisTask(Task task) {
     _tasks.removeWhere((t) => t.id == task.id);
     log('Deleted only this occurrence of task: ${task.title}');
   }
 
-// Helper to check if a task is generated from the original task
-  bool _isGeneratedFromTask(Task generatedTask, Task originalTask) {
-    return generatedTask.title == originalTask.title &&
-        generatedTask.description == originalTask.description &&
-        generatedTask.isRepeating == true &&
-        generatedTask.repeatInterval == originalTask.repeatInterval;
+  // Delete all tasks linked to a specific repeatingGroupId
+  void deleteTasksByGroupId(String repeatingGroupId) {
+    // Filter and remove all tasks with the specified groupId
+    final tasksToDelete = _tasks
+        .where((task) => task.repeatingGroupId == repeatingGroupId)
+        .toList();
+
+    if (tasksToDelete.isNotEmpty) {
+      _tasks.removeWhere((task) => task.repeatingGroupId == repeatingGroupId);
+      log('Deleted ${tasksToDelete.length} tasks with repeatingGroupId: $repeatingGroupId');
+      notifyListeners(); // Notify listeners about the change
+    } else {
+      log('No tasks found with repeatingGroupId: $repeatingGroupId');
+    }
   }
 
   // Add a sub-task to a task
