@@ -1,4 +1,3 @@
-import 'package:app/views/home/home_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
