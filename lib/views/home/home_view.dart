@@ -1,4 +1,3 @@
-// views/home/home_view.dart
 import 'package:animate_do/animate_do.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
@@ -6,6 +5,7 @@ import 'package:app/utils/constrants.dart';
 import 'package:app/views/home/components/fab.dart';
 import 'package:app/views/home/components/home_app_bar.dart';
 import 'package:app/views/home/components/points_summary_text.dart';
+import 'package:app/views/home/components/points_trend_chart.dart';
 import 'package:app/views/home/components/slider_drawer.dart';
 import 'package:app/views/home/widget/calendar_view.dart';
 import 'package:app/views/home/widget/points_history_view.dart';
@@ -56,6 +56,7 @@ class _HomeViewState extends State<HomeView> {
         children: [
           _buildHeader(textTheme),
           const Divider(thickness: 2, indent: 100),
+          const PointsTrendChart(), // Points Trend Chart Section
           _buildViewSelector(),
           Expanded(child: _buildTaskListOrView(textTheme)),
         ],
@@ -79,7 +80,6 @@ class _HomeViewState extends State<HomeView> {
               double buttonPadding = constraints.maxWidth < 400 ? 4.0 : 8.0;
               double fontSize = constraints.maxWidth < 400 ? 14.0 : 16.0;
 
-              // Ensure children and isSelected lengths match
               final views = [
                 'List',
                 'Due Date',
@@ -139,7 +139,6 @@ class _HomeViewState extends State<HomeView> {
         } else if (selectedView == 'Due Date') {
           return DueDateView(tasks: taskProvider.tasks);
         } else if (selectedView == 'Points History') {
-          // New view
           return const PointsHistoryView();
         } else {
           return _buildTaskList(textTheme);
@@ -163,7 +162,7 @@ class _HomeViewState extends State<HomeView> {
                   value: Provider.of<TaskProvider>(context).tasks.isNotEmpty
                       ? Provider.of<TaskProvider>(context).completedTasks /
                           Provider.of<TaskProvider>(context).tasks.length
-                      : 0, // Handle empty list by setting to 0
+                      : 0,
                   backgroundColor: Colors.grey[300],
                   valueColor: AlwaysStoppedAnimation(AppColors.primaryColor),
                 ),
@@ -188,7 +187,6 @@ class _HomeViewState extends State<HomeView> {
               ),
             ],
           ),
-          // Include PointsSummaryCard
           const PointsSummaryText(),
         ],
       ),
