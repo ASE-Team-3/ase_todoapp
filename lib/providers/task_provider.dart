@@ -7,6 +7,7 @@ import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
+import 'package:app/providers/points_manager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,17 +15,17 @@ class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final PointsManager _pointsManager =
+      PointsManager(); // PointsManager instance
 
   TaskProvider() {
     _initializeNotifications();
   }
-  List<PointsHistoryEntry> pointsHistory = [];
+  List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
 
   List<Task> get tasks => _tasks;
 
-  int _totalPoints = 0; // New property to track total points
-
-  int get totalPoints => _totalPoints; // Getter for UI access
+  int get totalPoints => _pointsManager.totalPoints;
 
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
@@ -372,23 +373,25 @@ class TaskProvider extends ChangeNotifier {
     throw Exception("Invalid repeat interval or custom days");
   }
 
-  // Existing methods remain unchanged
   void toggleTaskCompletion(Task task) {
-    task.isCompleted = !task.isCompleted; // Toggle completion status
-    if (task.isCompleted) {
-      // Show notification when a task is completed
-      _totalPoints += task.points;
+    final isNowCompleted = !task.isCompleted;
+    task.isCompleted = isNowCompleted; // Toggle completion status.
+
+    if (isNowCompleted) {
+      _pointsManager.awardPoints(
+        task.points,
+        'Task "${task.title}" completed',
+      );
       _sendNotification('Hurrah!', 'You completed the task: "${task.title}"!');
     } else {
-      _totalPoints -= task.points;
-      log('Task marked as incomplete: "${task.title}"'); // Debug log
+      _pointsManager.deductPoints(
+        task.points,
+        'Task "${task.title}" marked as incomplete',
+      );
+      log('Task marked as incomplete: "${task.title}"');
     }
-    _updatePointsHistory(); // Record each point change
-    notifyListeners();
-  }
 
-  void _updatePointsHistory() {
-    pointsHistory.add(PointsHistoryEntry(DateTime.now(), _totalPoints));
+    notifyListeners();
   }
 
   Task? getTaskById(String taskId) {

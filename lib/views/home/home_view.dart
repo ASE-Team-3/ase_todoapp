@@ -5,8 +5,10 @@ import 'package:app/utils/app_str.dart';
 import 'package:app/utils/constrants.dart';
 import 'package:app/views/home/components/fab.dart';
 import 'package:app/views/home/components/home_app_bar.dart';
+import 'package:app/views/home/components/points_summary_text.dart';
 import 'package:app/views/home/components/slider_drawer.dart';
 import 'package:app/views/home/widget/calendar_view.dart';
+import 'package:app/views/home/widget/points_history_view.dart';
 import 'package:app/views/home/widget/priority_view.dart';
 import 'package:app/views/home/widget/due_date_view.dart';
 import 'package:app/views/home/widget/task_widget.dart';
@@ -74,9 +76,19 @@ class _HomeViewState extends State<HomeView> {
           const SizedBox(height: 8),
           LayoutBuilder(
             builder: (context, constraints) {
-              // Dynamically adapt padding and alignment based on screen width
               double buttonPadding = constraints.maxWidth < 400 ? 4.0 : 8.0;
               double fontSize = constraints.maxWidth < 400 ? 14.0 : 16.0;
+
+              // Ensure children and isSelected lengths match
+              final views = [
+                'List',
+                'Due Date',
+                'Priority',
+                'Calendar',
+                'Points History',
+              ];
+              final isSelected =
+                  views.map((view) => selectedView == view).toList();
 
               return Wrap(
                 spacing: 8,
@@ -89,52 +101,24 @@ class _HomeViewState extends State<HomeView> {
                     fillColor: Colors.grey[200],
                     selectedBorderColor: AppColors.primaryColor,
                     borderColor: Colors.grey,
-                    isSelected: [
-                      selectedView == 'List',
-                      selectedView == 'Due Date',
-                      selectedView == 'Priority',
-                      selectedView == 'Calendar',
-                    ],
+                    isSelected: isSelected,
                     onPressed: (index) {
                       setState(() {
-                        selectedView =
-                            ['List', 'Due Date', 'Priority', 'Calendar'][index];
+                        selectedView = views[index];
                       });
                     },
-                    children: [
-                      Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: buttonPadding),
-                        child: Text(
-                          'List',
-                          style: TextStyle(fontSize: fontSize),
-                        ),
-                      ),
-                      Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: buttonPadding),
-                        child: Text(
-                          'Due Date',
-                          style: TextStyle(fontSize: fontSize),
-                        ),
-                      ),
-                      Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: buttonPadding),
-                        child: Text(
-                          'Priority',
-                          style: TextStyle(fontSize: fontSize),
-                        ),
-                      ),
-                      Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: buttonPadding),
-                        child: Text(
-                          'Calendar',
-                          style: TextStyle(fontSize: fontSize),
-                        ),
-                      ),
-                    ],
+                    children: views
+                        .map(
+                          (view) => Padding(
+                            padding:
+                                EdgeInsets.symmetric(horizontal: buttonPadding),
+                            child: Text(
+                              view,
+                              style: TextStyle(fontSize: fontSize),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               );
@@ -154,6 +138,9 @@ class _HomeViewState extends State<HomeView> {
           return PriorityView(tasks: taskProvider.tasks);
         } else if (selectedView == 'Due Date') {
           return DueDateView(tasks: taskProvider.tasks);
+        } else if (selectedView == 'Points History') {
+          // New view
+          return const PointsHistoryView();
         } else {
           return _buildTaskList(textTheme);
         }
@@ -181,12 +168,12 @@ class _HomeViewState extends State<HomeView> {
                   valueColor: AlwaysStoppedAnimation(AppColors.primaryColor),
                 ),
               ),
-              SizedBox(width: 20),
+              const SizedBox(width: 20),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(AppStr.mainTitle, style: textTheme.headlineMedium),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Consumer<TaskProvider>(
                     builder: (context, taskProvider, _) {
                       return Text(
@@ -201,29 +188,8 @@ class _HomeViewState extends State<HomeView> {
               ),
             ],
           ),
-          // Display the total points
-          Consumer<TaskProvider>(
-            builder: (context, taskProvider, _) {
-              return Column(
-                children: [
-                  Text(
-                    "Reward Points",
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryColor,
-                    ),
-                  ),
-                  Text(
-                    "${taskProvider.totalPoints} pts",
-                    style: textTheme.headlineMedium?.copyWith(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+          // Include PointsSummaryCard
+          const PointsSummaryText(),
         ],
       ),
     );
