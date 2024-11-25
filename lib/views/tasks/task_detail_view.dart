@@ -1,3 +1,4 @@
+// views/tasks/task_detail_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -155,6 +156,19 @@ class TaskDetailView extends StatelessWidget {
             ),
             Text(
               formattedCreationDate,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            const Divider(),
+            Text(
+              'Reward Points:',
+              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            Text(
+              '${task.points} pts',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),

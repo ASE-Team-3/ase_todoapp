@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:developer';
 import 'package:app/utils/deadline_utils.dart';
+import 'package:app/models/points_history_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
+import 'package:app/providers/points_manager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,12 +15,17 @@ class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final PointsManager _pointsManager =
+      PointsManager(); // PointsManager instance
 
   TaskProvider() {
     _initializeNotifications();
   }
+  List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
 
   List<Task> get tasks => _tasks;
+
+  int get totalPoints => _pointsManager.totalPoints;
 
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
@@ -100,6 +107,7 @@ class TaskProvider extends ChangeNotifier {
     String? repeatInterval,
     int? customRepeatDays,
     List<Attachment>? attachments,
+    int? points,
   }) {
     final DateTime? calculatedDeadline = selectedDeadline ??
         (flexibleDeadline != null
@@ -111,6 +119,7 @@ class TaskProvider extends ChangeNotifier {
       description: description,
       deadline: calculatedDeadline,
       flexibleDeadline: flexibleDeadline,
+      points: points ?? task.points,
       isRepeating: isRepeating ?? task.isRepeating,
       repeatInterval: repeatInterval ?? task.repeatInterval,
       customRepeatDays: customRepeatDays ?? task.customRepeatDays,
@@ -172,7 +181,8 @@ class TaskProvider extends ChangeNotifier {
     DateTime? selectedDeadline, // New specific deadline
     String? flexibleDeadline, // New flexible deadline
     String? repeatInterval, // New repeat interval (e.g., "daily", "monthly")
-    int? customRepeatDays, // Custom interval days
+    int? customRepeatDays,
+    int? points, // Custom interval days
   }) {
     final groupId = task.repeatingGroupId;
     if (groupId == null) return;
@@ -190,6 +200,7 @@ class TaskProvider extends ChangeNotifier {
           _tasks[taskIndex] = _tasks[taskIndex].copyWith(
             title: title,
             description: description,
+            points: points,
             deadline: _calculateDynamicDeadline(
               startDate: baseDeadline,
               interval: repeatInterval ?? task.repeatInterval,
@@ -222,6 +233,7 @@ class TaskProvider extends ChangeNotifier {
           _tasks[taskIndex] = _tasks[taskIndex].copyWith(
             title: title,
             description: description,
+            points: points,
             deadline: _calculateDynamicDeadline(
               startDate: baseDeadline,
               interval: repeatInterval ?? task.repeatInterval,
@@ -241,6 +253,7 @@ class TaskProvider extends ChangeNotifier {
         _tasks[index] = _tasks[index].copyWith(
           title: title,
           description: description,
+          points: points,
           deadline: selectedDeadline ?? _tasks[index].deadline,
           flexibleDeadline: flexibleDeadline ?? _tasks[index].flexibleDeadline,
           repeatInterval: repeatInterval ?? _tasks[index].repeatInterval,
@@ -360,15 +373,24 @@ class TaskProvider extends ChangeNotifier {
     throw Exception("Invalid repeat interval or custom days");
   }
 
-  // Existing methods remain unchanged
   void toggleTaskCompletion(Task task) {
-    task.isCompleted = !task.isCompleted; // Toggle completion status
-    if (task.isCompleted) {
-      // Show notification when a task is completed
+    final isNowCompleted = !task.isCompleted;
+    task.isCompleted = isNowCompleted; // Toggle completion status.
+
+    if (isNowCompleted) {
+      _pointsManager.awardPoints(
+        task.points,
+        'Task "${task.title}" completed',
+      );
       _sendNotification('Hurrah!', 'You completed the task: "${task.title}"!');
     } else {
-      log('Task marked as incomplete: "${task.title}"'); // Debug log
+      _pointsManager.deductPoints(
+        task.points,
+        'Task "${task.title}" marked as incomplete',
+      );
+      log('Task marked as incomplete: "${task.title}"');
     }
+
     notifyListeners();
   }
 
@@ -381,6 +403,7 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
+  // Remove a task
   void removeTask(Task task) {
     if (_tasks.any((t) => t.id == task.id)) {
       _tasks.removeWhere((t) => t.id == task.id);

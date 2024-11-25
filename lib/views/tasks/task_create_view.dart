@@ -13,6 +13,7 @@ import 'package:app/views/tasks/components/repeating_toggle.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/task.dart';
@@ -20,7 +21,7 @@ import 'package:app/providers/task_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class TaskCreateView extends StatefulWidget {
-  final Task? task; // Add Task parameter for editing
+  final Task? task;
 
   const TaskCreateView({super.key, this.task});
 
@@ -32,9 +33,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController titleTaskController = TextEditingController();
   final TextEditingController descriptionTaskController =
       TextEditingController();
+  final TextEditingController pointsController = TextEditingController();
   DateTime? selectedDeadline;
   String? flexibleDeadline;
   List<Attachment> attachments = [];
+  int lastValidPoints = 0;
   bool isRepeating = false;
   String? repeatInterval; // E.g., "daily", "weekly", etc.
   int? customRepeatDays; // For custom intervals
@@ -44,11 +47,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   void initState() {
     super.initState();
     if (widget.task != null) {
-      // Initialize fields with task data if editing
       titleTaskController.text = widget.task!.title;
       descriptionTaskController.text = widget.task!.description;
       selectedDeadline = widget.task!.deadline;
       attachments = List.from(widget.task!.attachments);
+      pointsController.text = widget.task!.points.toString();
+      lastValidPoints = widget.task!.points;
     }
   }
 
@@ -83,7 +87,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        if (widget.task != null) // Show delete only if editing
+        if (widget.task != null)
           _buildButton(
             label: AppStr.deleteTask,
             icon: Icons.close,
@@ -103,13 +107,14 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }
 
   void _saveOrUpdateTask() {
+    final enteredPoints = int.tryParse(pointsController.text) ?? 0;
+
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         (selectedDeadline != null || flexibleDeadline != null)) {
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       if (widget.task == null) {
-        // Creating a new task
         final newTask = Task(
           id: const Uuid().v4(),
           title: titleTaskController.text,
@@ -121,6 +126,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           customRepeatDays: customRepeatDays,
           nextOccurrence: _calculateNextOccurrence(),
           attachments: attachments,
+          points: enteredPoints,
         );
         taskProvider.addTask(newTask);
         Navigator.pop(context);
@@ -140,6 +146,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             repeatInterval: repeatInterval,
             customRepeatDays: customRepeatDays,
             attachments: attachments,
+            points: enteredPoints,
           );
           _resetFields();
           Navigator.pop(context);
@@ -147,12 +154,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields.')),
+        const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
     }
   }
 
   Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
+    final enteredPoints = int.tryParse(pointsController.text) ?? 0;
     await showDialog(
       context: context,
       builder: (context) {
@@ -170,6 +178,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   option: "all",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
+                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
@@ -188,6 +197,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   option: "this_and_following",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
+                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
@@ -206,6 +216,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   option: "only_this",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
+                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
@@ -226,6 +237,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   void _resetFields() {
     titleTaskController.clear();
     descriptionTaskController.clear();
+    pointsController.clear;
     setState(() {
       selectedDeadline = null;
       attachments.clear();
@@ -270,13 +282,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       } catch (e) {
         log('Error deleting task: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete task.')),
+          const SnackBar(content: Text(AppStr.failedToDeleteTask)),
         );
       }
     }
   }
 
-  // Reusable button widget
   Widget _buildButton({
     required String label,
     IconData? icon,
@@ -301,7 +312,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             Text(
               label,
               style: TextStyle(
-                  color: icon != null ? AppColors.primaryColor : Colors.white),
+                color: icon != null ? AppColors.primaryColor : Colors.white,
+              ),
             ),
           ],
         ),
@@ -328,6 +340,50 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             controller: descriptionTaskController,
             isForDescription: true,
             hintText: AppStr.placeholderDescription,
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: pointsController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: AppStr.assignPointsLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    int parsedValue = int.tryParse(value) ?? lastValidPoints;
+                    if (parsedValue > 100) {
+                      pointsController.text = lastValidPoints.toString();
+                      pointsController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: pointsController.text.length),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(AppStr.pointsExceedMessage),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } else {
+                      lastValidPoints = parsedValue;
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "${AppStr.currentPointsLabel}: ${pointsController.text.isEmpty ? 0 : pointsController.text} points",
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           FlexibleDeadlineDropdown(
@@ -403,8 +459,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Top header with title text
   Widget _buildTopSideTexts(TextTheme textTheme) {
+    // Determine if it's an add or update action
+    final titleText =
+        widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
@@ -414,7 +473,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
-              AppStr.addNewTask + AppStr.taskStrnig,
+              titleText,
               style: textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -428,12 +487,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Section to manage attachments
   Widget _buildAttachmentsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Attachments',
+        Text(AppStr.attachmentsLabel,
             style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Wrap(
@@ -442,12 +500,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             ElevatedButton.icon(
               onPressed: _pickFile,
               icon: const Icon(Icons.attach_file),
-              label: const Text('Attach File'),
+              label: Text(AppStr.attachFile),
             ),
             ElevatedButton.icon(
               onPressed: _promptForLink,
               icon: const Icon(Icons.link),
-              label: const Text('Add Link'),
+              label: Text(AppStr.addLink),
             ),
           ],
         ),
@@ -517,7 +575,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Icon for each attachment type
   IconData _getAttachmentIcon(AttachmentType type) {
     switch (type) {
       case AttachmentType.file:
@@ -531,7 +588,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
-  // Method to pick files
   void _pickFile() async {
     final result = await FilePicker.platform.pickFiles();
     if (result != null) {
@@ -546,22 +602,21 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
-  // Method to add links
   void _promptForLink() {
     showDialog(
       context: context,
       builder: (context) {
         final linkController = TextEditingController();
         return AlertDialog(
-          title: const Text("Add Link"),
+          title: Text(AppStr.addLinkTitle),
           content: TextField(
             controller: linkController,
-            decoration: const InputDecoration(hintText: "Enter URL"),
+            decoration: InputDecoration(hintText: AppStr.enterUrl),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: Text(AppStr.cancel),
             ),
             TextButton(
               onPressed: () {
@@ -576,7 +631,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   Navigator.pop(context);
                 }
               },
-              child: const Text("Add"),
+              child: Text(AppStr.add),
             ),
           ],
         );
@@ -584,7 +639,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Remove attachments by ID
   void _removeAttachment(String attachmentId) {
     setState(() {
       attachments.removeWhere((a) => a.id == attachmentId);
@@ -595,6 +649,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   void dispose() {
     titleTaskController.dispose();
     descriptionTaskController.dispose();
+    pointsController.dispose();
     super.dispose();
   }
 }

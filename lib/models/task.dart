@@ -10,6 +10,7 @@ class Task {
   final String?
       flexibleDeadline; // Flexible deadline (e.g., "Today", "This Week")
   final DateTime creationDate;
+  final DateTime updatedAt; // New timestamp for the last update
   final int priority; // Priority field (1 for high, 2 for medium, 3 for low)
   final bool isRepeating; // Indicates whether the task repeats
   final String?
@@ -20,6 +21,7 @@ class Task {
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
+  int points; // New points attribute
 
   Task({
     required this.title,
@@ -33,14 +35,17 @@ class Task {
     this.nextOccurrence,
     this.repeatingGroupId, // Default null for non-repeating tasks
     DateTime? creationDate,
-    String? id, // Nullable parameter for UUID
+    DateTime? updatedAt,
+    String? id,
     this.isCompleted = false,
     List<Attachment>? attachments,
-    List<SubTask>? subTasks, // Optional list of sub-tasks
-  })  : id = id ?? const Uuid().v4(), // Generate a new UUID if none is provided
+    List<SubTask>? subTasks,
+    this.points = 0, // Initialize points to 0
+  })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now(), // Initialize updatedAt
         attachments = attachments ?? [],
-        subTasks = subTasks ?? []; // Initialize sub-tasks list
+        subTasks = subTasks ?? [];
 
   Task copyWith({
     String? id,
@@ -49,6 +54,7 @@ class Task {
     DateTime? deadline,
     String? flexibleDeadline,
     DateTime? creationDate,
+    DateTime? updatedAt, // Include updatedAt in copyWith
     int? priority, // Include priority in copyWith
     bool? isRepeating, // Include isRepeating in copyWith
     String? repeatInterval, // Include repeatInterval in copyWith
@@ -58,6 +64,7 @@ class Task {
     List<Attachment>? attachments,
     bool? isCompleted,
     List<SubTask>? subTasks,
+    int? points, // Add points in copyWith
   }) {
     return Task(
       id: id ?? this.id,
@@ -66,6 +73,7 @@ class Task {
       deadline: deadline ?? this.deadline, // Retain the deadline parameter
       flexibleDeadline: flexibleDeadline ?? this.flexibleDeadline,
       creationDate: creationDate ?? this.creationDate,
+      updatedAt: updatedAt ?? DateTime.now(), // Set updatedAt to current time
       priority: priority ?? this.priority, // Set the new priority field
       isRepeating: isRepeating ?? this.isRepeating, // Update isRepeating field
       repeatInterval:
@@ -79,6 +87,7 @@ class Task {
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
+      points: points ?? this.points, // Update points
     );
   }
 }
