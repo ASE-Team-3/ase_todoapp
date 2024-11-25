@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'package:app/utils/datetime_utils.dart';
 import 'package:app/utils/deadline_utils.dart';
 import 'package:app/models/points_history_entry.dart';
 import 'package:flutter/material.dart';
@@ -22,8 +23,6 @@ class TaskProvider extends ChangeNotifier {
     _initializeNotifications();
   }
   List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
-
-  List<Task> get tasks => _tasks;
 
   int get totalPoints => _pointsManager.totalPoints;
 
@@ -75,33 +74,59 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // Add a new task
+  /// This function retrieves the list of tasks with their `DateTime` fields
+  /// (such as `creationDate`, `deadline`, and `nextOccurrence`) converted
+  /// from UTC to the user's local timezone.
+  ///
+  /// Usage:
+  /// - Call this function whenever you need to display or manipulate tasks
+  ///   with localized `DateTime` values.
+  ///
+  /// Note:
+  /// - All operations on tasks (e.g., filtering by deadline) should use
+  ///   the output of this function to ensure correct time interpretation.
+  ///
+  /// Returns:
+  /// - A `List<Task>` where all `DateTime` fields are converted to local time.
+  List<Task> Function() get tasks => () {
+        return _tasks.map((task) {
+          // Convert deadline to local time before returning
+          return task.copyWith(
+            creationDate: convertUtcToLocal(task.creationDate),
+            deadline: convertUtcToLocal(task.deadline),
+            nextOccurrence: convertUtcToLocal(task.nextOccurrence),
+          );
+        }).toList();
+      };
+
   void addTask(Task task) {
+    // Calculate flexible deadline if no specific deadline is provided
     if (task.flexibleDeadline != null && task.deadline == null) {
-      task = task.copyWith(
-        deadline: calculateDeadlineFromFlexible(task.flexibleDeadline!),
-      );
+      final localDeadline =
+          calculateDeadlineFromFlexible(task.flexibleDeadline!);
+      task = task.copyWith(deadline: localDeadline?.toUtc()); // Convert to UTC
+    } else {
+      task = task.copyWith(deadline: task.deadline?.toUtc()); // Ensure UTC
     }
 
+    // Handle repeating tasks
     if (task.isRepeating) {
-      // Generate a group ID for all repeating tasks
-      final repeatingGroupId = const Uuid().v4();
+      final repeatingGroupId = const Uuid().v4(); // Generate unique group ID
       final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
 
       _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
-      _tasks.add(task);
+      _tasks.add(task); // Add non-repeating task
     }
 
     notifyListeners();
   }
 
-  // Update a task
   void updateTask(
     Task task, {
     required String title,
     required String description,
-    DateTime? selectedDeadline,
+    DateTime? selectedDeadline, // Raw input from UI
     String? flexibleDeadline,
     bool? isRepeating,
     String? repeatInterval,
@@ -109,21 +134,23 @@ class TaskProvider extends ChangeNotifier {
     List<Attachment>? attachments,
     int? points,
   }) {
-    final DateTime? calculatedDeadline = selectedDeadline ??
+    // Calculate the deadline, either specific or from flexibleDeadline
+    final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ??
         (flexibleDeadline != null
-            ? calculateDeadlineFromFlexible(flexibleDeadline)
+            ? calculateDeadlineFromFlexible(flexibleDeadline)?.toUtc()
             : null);
 
     final updatedTask = task.copyWith(
       title: title,
       description: description,
-      deadline: calculatedDeadline,
+      deadline: calculatedDeadline, // Ensure UTC
       flexibleDeadline: flexibleDeadline,
       points: points ?? task.points,
       isRepeating: isRepeating ?? task.isRepeating,
       repeatInterval: repeatInterval ?? task.repeatInterval,
       customRepeatDays: customRepeatDays ?? task.customRepeatDays,
       attachments: attachments ?? task.attachments,
+      updatedAt: DateTime.now().toUtc(), // Update the timestamp in UTC
     );
 
     int index = _tasks.indexWhere((t) => t.id == task.id);
@@ -144,7 +171,7 @@ class TaskProvider extends ChangeNotifier {
   void _generateRepeatingTasks(Task task, String? groupId, {DateTime? limit}) {
     if (!task.isRepeating || task.repeatInterval == null) return;
 
-    final DateTime now = DateTime.now();
+    final DateTime now = DateTime.now().toUtc();
     final DateTime defaultLimit =
         now.add(const Duration(days: 730)); // Default: 2 years
     final DateTime generationLimit = limit ?? defaultLimit;
@@ -167,7 +194,7 @@ class TaskProvider extends ChangeNotifier {
         interval: task.repeatInterval,
         customDays: task.customRepeatDays,
         lastOccurrence: nextOccurrence,
-      );
+      ).toUtc();
     }
 
     log('Extended repeating tasks for: ${task.title}');
@@ -187,11 +214,14 @@ class TaskProvider extends ChangeNotifier {
     final groupId = task.repeatingGroupId;
     if (groupId == null) return;
 
+    // Convert selectedDeadline to UTC
+    final DateTime? utcSelectedDeadline = selectedDeadline?.toUtc();
+
     if (option == "all") {
       // Update all tasks with the same repeating groupId
       final firstTask = _tasks.firstWhere((t) => t.id == task.id);
-      DateTime baseDeadline = selectedDeadline ??
-          calculateDeadlineFromFlexible(flexibleDeadline!) ??
+      DateTime baseDeadline = utcSelectedDeadline ??
+          calculateDeadlineFromFlexible(flexibleDeadline!)?.toUtc() ??
           firstTask.deadline!;
 
       for (int i = 0; i < _tasks.length; i++) {
@@ -207,7 +237,7 @@ class TaskProvider extends ChangeNotifier {
               customDays: customRepeatDays ?? task.customRepeatDays,
               iteration:
                   taskIndex, // Adjust iteration for dynamic recalculation
-            ),
+            ).toUtc(), // Ensure UTC
             repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
             customRepeatDays: customRepeatDays,
             flexibleDeadline: flexibleDeadline,
@@ -217,8 +247,8 @@ class TaskProvider extends ChangeNotifier {
     } else if (option == "this_and_following") {
       // Update this and all subsequent tasks
       bool update = false;
-      DateTime baseDeadline = selectedDeadline ??
-          calculateDeadlineFromFlexible(flexibleDeadline!) ??
+      DateTime baseDeadline = utcSelectedDeadline ??
+          calculateDeadlineFromFlexible(flexibleDeadline!)?.toUtc() ??
           task.deadline!;
 
       for (int i = 0; i < _tasks.length; i++) {
@@ -239,7 +269,7 @@ class TaskProvider extends ChangeNotifier {
               interval: repeatInterval ?? task.repeatInterval,
               customDays: customRepeatDays ?? task.customRepeatDays,
               iteration: iterationOffset,
-            ),
+            ).toUtc(), // Ensure UTC
             repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
             customRepeatDays: customRepeatDays,
             flexibleDeadline: flexibleDeadline,
@@ -254,7 +284,7 @@ class TaskProvider extends ChangeNotifier {
           title: title,
           description: description,
           points: points,
-          deadline: selectedDeadline ?? _tasks[index].deadline,
+          deadline: utcSelectedDeadline ?? _tasks[index].deadline,
           flexibleDeadline: flexibleDeadline ?? _tasks[index].flexibleDeadline,
           repeatInterval: repeatInterval ?? _tasks[index].repeatInterval,
           customRepeatDays: customRepeatDays ?? _tasks[index].customRepeatDays,
@@ -265,7 +295,6 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Helper to calculate updated deadlines dynamically for repeating tasks
   DateTime _calculateDynamicDeadline({
     required DateTime startDate,
     required String? interval,
@@ -282,7 +311,7 @@ class TaskProvider extends ChangeNotifier {
       );
     }
 
-    return nextOccurrence;
+    return nextOccurrence.toUtc(); // Ensure UTC
   }
 
   // Extend repeating tasks beyond the current 2-year limit

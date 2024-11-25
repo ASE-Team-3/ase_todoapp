@@ -5,25 +5,29 @@ import 'package:flutter/material.dart';
 final Map<String, DateTime? Function()> predefinedDeadlines = {
   "Today": () {
     // End of the current day
-    final DateTime now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, 23, 59);
+    final DateTime now = DateTime.now().toUtc();
+    return DateTime(now.year, now.month, now.day, 23, 59).toUtc();
   },
   "This Week": () {
     // End of the current week (Sunday, 23:59)
-    final DateTime now = DateTime.now();
+    final DateTime now = DateTime.now().toUtc();
     final int daysToEndOfWeek = 7 - now.weekday;
-    return DateTime(now.year, now.month, now.day + daysToEndOfWeek, 23, 59);
+    return DateTime(now.year, now.month, now.day + daysToEndOfWeek, 23, 59)
+        .toUtc();
   },
   "This Month": () {
     // Last minute of the current month
-    final DateTime now = DateTime.now();
-    final DateTime firstDayOfNextMonth = DateTime(now.year, now.month + 1, 1);
+    final DateTime now = DateTime.now().toUtc();
+    final DateTime firstDayOfNextMonth =
+        DateTime(now.year, now.month + 1, 1).toUtc();
     return firstDayOfNextMonth.subtract(const Duration(minutes: 1));
   },
   "This Year": () {
     // Last minute of the current year
-    final DateTime now = DateTime.now();
-    return DateTime(now.year + 1, 1, 1).subtract(const Duration(minutes: 1));
+    final DateTime now = DateTime.now().toUtc();
+    return DateTime(now.year + 1, 1, 1)
+        .subtract(const Duration(minutes: 1))
+        .toUtc();
   },
   // "Specific Deadline" requires user input, so it's not precomputed
 };

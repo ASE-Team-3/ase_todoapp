@@ -23,9 +23,9 @@ class HeaderSection extends StatelessWidget {
                 width: 40,
                 height: 40,
                 child: CircularProgressIndicator(
-                  value: Provider.of<TaskProvider>(context).tasks.isNotEmpty
+                  value: Provider.of<TaskProvider>(context).tasks().isNotEmpty
                       ? Provider.of<TaskProvider>(context).completedTasks /
-                          Provider.of<TaskProvider>(context).tasks.length
+                          Provider.of<TaskProvider>(context).tasks().length
                       : 0,
                   backgroundColor: Colors.grey[300],
                   valueColor:
@@ -41,7 +41,7 @@ class HeaderSection extends StatelessWidget {
                   Consumer<TaskProvider>(
                     builder: (context, taskProvider, _) {
                       return Text(
-                        "${taskProvider.completedTasks} of ${taskProvider.tasks.length} Tasks Completed",
+                        "${taskProvider.completedTasks} of ${taskProvider.tasks().length} Tasks Completed",
                         style: textTheme.displaySmall?.copyWith(
                           color: Colors.grey[600],
                         ),

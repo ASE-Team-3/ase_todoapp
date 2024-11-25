@@ -21,7 +21,7 @@ class TaskDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     TaskProvider taskProvider = Provider.of<TaskProvider>(context);
 
-    final task = taskProvider.tasks.firstWhere(
+    final task = taskProvider.tasks().firstWhere(
       (t) => t.id == taskId,
       orElse: () {
         return Task(

@@ -6,11 +6,11 @@ class Task {
   final String id; // UUID
   final String title;
   final String description;
-  final DateTime? deadline; // Specific deadline
+  final DateTime? deadline; // Store in UTC
   final String?
       flexibleDeadline; // Flexible deadline (e.g., "Today", "This Week")
-  final DateTime creationDate;
-  final DateTime updatedAt; // New timestamp for the last update
+  final DateTime creationDate; // Store in UTC
+  final DateTime updatedAt; // Store in UTC
   final int priority; // Priority field (1 for high, 2 for medium, 3 for low)
   final bool isRepeating; // Indicates whether the task repeats
   final String?
@@ -42,8 +42,8 @@ class Task {
     List<SubTask>? subTasks,
     this.points = 0, // Initialize points to 0
   })  : id = id ?? const Uuid().v4(),
-        creationDate = creationDate ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now(), // Initialize updatedAt
+        creationDate = creationDate?.toUtc() ?? DateTime.now().toUtc(),
+        updatedAt = updatedAt?.toUtc() ?? DateTime.now().toUtc(),
         attachments = attachments ?? [],
         subTasks = subTasks ?? [];
 
@@ -70,10 +70,10 @@ class Task {
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
-      deadline: deadline ?? this.deadline, // Retain the deadline parameter
+      deadline: deadline?.toUtc() ?? this.deadline?.toUtc(),
       flexibleDeadline: flexibleDeadline ?? this.flexibleDeadline,
-      creationDate: creationDate ?? this.creationDate,
-      updatedAt: updatedAt ?? DateTime.now(), // Set updatedAt to current time
+      creationDate: creationDate?.toUtc() ?? this.creationDate,
+      updatedAt: updatedAt?.toUtc() ?? DateTime.now().toUtc(),
       priority: priority ?? this.priority, // Set the new priority field
       isRepeating: isRepeating ?? this.isRepeating, // Update isRepeating field
       repeatInterval:

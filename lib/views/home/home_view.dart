@@ -69,15 +69,15 @@ class _HomeViewState extends State<HomeView> {
 
     switch (selectedView) {
       case AppStr.calendar:
-        return CalendarView(tasks: taskProvider.tasks);
+        return CalendarView(tasks: taskProvider.tasks());
       case AppStr.priority:
-        return PriorityView(tasks: taskProvider.tasks);
+        return PriorityView(tasks: taskProvider.tasks());
       case AppStr.dueDate:
-        return DueDateView(tasks: taskProvider.tasks);
+        return DueDateView(tasks: taskProvider.tasks());
       case AppStr.pointsHistory:
         return const PointsHistoryView();
       case AppStr.list:
-        return TaskListView(tasks: taskProvider.tasks);
+        return TaskListView(tasks: taskProvider.tasks());
       default:
         return const PointsView();
     }

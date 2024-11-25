@@ -14,7 +14,8 @@ class NearDeadlineTasksSection extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     // Get tasks sorted by deadline
-    final nearDeadlineTasks = taskProvider.tasks
+    final nearDeadlineTasks = taskProvider
+        .tasks()
         .where((task) => task.deadline != null && !task.isCompleted)
         .toList()
       ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
