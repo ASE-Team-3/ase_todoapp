@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:app/utils/datetime_utils.dart';
 import 'package:app/utils/deadline_utils.dart';
 import 'package:app/models/points_history_entry.dart';
+import 'package:app/utils/notification_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -18,6 +19,7 @@ class TaskProvider extends ChangeNotifier {
       FlutterLocalNotificationsPlugin();
   final PointsManager _pointsManager =
       PointsManager(); // PointsManager instance
+  final NotificationThrottler _notificationThrottler = NotificationThrottler();
 
   TaskProvider() {
     _initializeNotifications();
@@ -404,23 +406,39 @@ class TaskProvider extends ChangeNotifier {
 
   void toggleTaskCompletion(Task task) {
     final isNowCompleted = !task.isCompleted;
-    task.isCompleted = isNowCompleted; // Toggle completion status.
 
+    // Ensure points are valid
+    final points = task.points;
+
+    // Update task immutably
+    final updatedTask = task.copyWith(isCompleted: isNowCompleted);
+
+    // Find the index of the task in the list and replace it immutably
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index != -1) {
+      _tasks[index] = updatedTask;
+    }
+
+    // Award or deduct points based on completion status
     if (isNowCompleted) {
       _pointsManager.awardPoints(
-        task.points,
+        points,
         'Task "${task.title}" completed',
       );
-      _sendNotification('Hurrah!', 'You completed the task: "${task.title}"!');
+      _notificationThrottler.sendThrottledNotification(
+        sendNotification: _sendNotification,
+        title: 'Hurrah!',
+        body: 'You completed the task: "${task.title}"!',
+      );
     } else {
       _pointsManager.deductPoints(
-        task.points,
+        points,
         'Task "${task.title}" marked as incomplete',
       );
       log('Task marked as incomplete: "${task.title}"');
     }
 
-    notifyListeners();
+    notifyListeners(); // Notify listeners about the state change
   }
 
   Task? getTaskById(String taskId) {
