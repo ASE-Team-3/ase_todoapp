@@ -28,4 +28,20 @@ class AppStr {
   static const String enterUrl = "Enter URL";
   static const String cancel = "Cancel";
   static const String add = "Add";
+
+  // Points View
+  static const String analyzePointsTrend = "Analyze your points trend below!";
+  static const String nearDeadlineTasks = "Near Deadline Tasks";
+  static const String noNearDeadlineTasks = "No near deadline tasks.";
+  static const String showMoreButton = "Show More";
+
+  // View Names
+  static const String home = "Home";
+  static const String list = "List";
+  static const String dueDate = "Due Date";
+  static const String priority = "Priority";
+  static const String calendar = "Calendar";
+  static const String pointsHistory = "Points History";
+  static const String settings = "Settings";
+  static const String details = "Details";
 }
