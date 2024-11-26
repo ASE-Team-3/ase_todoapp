@@ -29,6 +29,27 @@ class AppStr {
   static const String cancel = "Cancel";
   static const String add = "Add";
 
+  // Task Create View
+  static const alertFrequencyLabel = "Alert Frequency";
+  static const alertFrequencyOnce = "Once";
+  static const alertFrequencyHourly = "Hourly";
+  static const alertFrequencyDaily = "Daily";
+  static const selectDate = "Select Date";
+  static const selectTime = "Select Time";
+  static const alertFrequency5Minutes = "5 minutes before";
+  static const alertFrequency1Hour = "1 hour before";
+  static const alertFrequency2Hours = "2 hours before";
+  static const alertFrequency3Hours = "3 hours before";
+  static const alertFrequency1Day = "1 day before";
+  static const alertFrequencyCustom = "Custom";
+  static const customReminderLabel = "Set Custom Reminder";
+  static const customReminderQuantityLabel = "Quantity";
+  static const customReminderErrorMessage =
+      "Invalid custom reminder configuration";
+  static const hours = "Hours";
+  static const days = "Days";
+  static const weeks = "Weeks";
+
   // Points View
   static const String analyzePointsTrend = "Analyze your points trend below!";
   static const String nearDeadlineTasks = "Near Deadline Tasks";

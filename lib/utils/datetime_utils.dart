@@ -1,6 +1,9 @@
 /// Utility functions for `DateTime` operations.
 library datetime_utils;
 
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/timezone.dart'; // Only import what we need
+
 /// Converts a `DateTime` object from UTC to the user's local timezone.
 ///
 /// If the input is null, this function returns null.
@@ -13,4 +16,10 @@ library datetime_utils;
 DateTime? convertUtcToLocal(DateTime? utcTime) {
   if (utcTime == null) return null;
   return utcTime.toLocal();
+}
+
+/// Converts a `DateTime` to `TZDateTime` for the local timezone.
+TZDateTime convertToTZDateTime(DateTime time) {
+  final location = tz.local; // Use local timezone
+  return TZDateTime.from(time, location);
 }

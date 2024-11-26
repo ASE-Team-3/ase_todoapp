@@ -1,13 +1,24 @@
+import 'package:app/initialize_timezones.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize timezone database
+  initializeTimeZones();
+  // Initialize FlutterLocalNotificationsPlugin
+  final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => TaskProvider()),
+        ChangeNotifierProvider(
+          create: (_) => TaskProvider(flutterLocalNotificationsPlugin),
+        ),
       ],
       child: const MyApp(),
     ),

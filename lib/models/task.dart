@@ -18,10 +18,13 @@ class Task {
   final int? customRepeatDays; // Number of days for custom intervals
   final DateTime? nextOccurrence; // Next occurrence for repeating tasks
   final String? repeatingGroupId; // Group ID for repeating tasks
+  final String?
+      alertFrequency; // "once", "hourly", "daily" for notification frequency
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
   int points; // New points attribute
+  final Map<String, dynamic>? customReminder; // New field for custom reminders
 
   Task({
     required this.title,
@@ -34,6 +37,7 @@ class Task {
     this.customRepeatDays,
     this.nextOccurrence,
     this.repeatingGroupId, // Default null for non-repeating tasks
+    this.alertFrequency = "once", // Default alert frequency
     DateTime? creationDate,
     DateTime? updatedAt,
     String? id,
@@ -41,6 +45,7 @@ class Task {
     List<Attachment>? attachments,
     List<SubTask>? subTasks,
     this.points = 0, // Initialize points to 0
+    this.customReminder,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate?.toUtc() ?? DateTime.now().toUtc(),
         updatedAt = updatedAt?.toUtc() ?? DateTime.now().toUtc(),
@@ -61,10 +66,12 @@ class Task {
     int? customRepeatDays, // Include customRepeatDays in copyWith
     DateTime? nextOccurrence, // Include nextOccurrence in copyWith
     String? repeatingGroupId, // Include repeatingGroupId in copyWith
+    String? alertFrequency, // Include alertFrequency in copyWith
     List<Attachment>? attachments,
     bool? isCompleted,
     List<SubTask>? subTasks,
     int? points, // Add points in copyWith
+    Map<String, dynamic>? customReminder,
   }) {
     return Task(
       id: id ?? this.id,
@@ -84,10 +91,13 @@ class Task {
           nextOccurrence ?? this.nextOccurrence, // Update nextOccurrence
       repeatingGroupId:
           repeatingGroupId ?? this.repeatingGroupId, // Update repeatingGroupId
+      alertFrequency:
+          alertFrequency ?? this.alertFrequency, // Update alertFrequency
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
       points: points ?? this.points, // Update points
+      customReminder: customReminder ?? this.customReminder,
     );
   }
 }

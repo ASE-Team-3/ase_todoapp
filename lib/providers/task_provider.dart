@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'dart:developer';
+import 'package:app/services/notification_service.dart';
 import 'package:app/utils/datetime_utils.dart';
 import 'package:app/utils/deadline_utils.dart';
 import 'package:app/models/points_history_entry.dart';
@@ -15,66 +15,20 @@ import 'package:uuid/uuid.dart';
 
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  final NotificationService _notificationService;
   final PointsManager _pointsManager =
       PointsManager(); // PointsManager instance
   final NotificationThrottler _notificationThrottler = NotificationThrottler();
 
-  TaskProvider() {
-    _initializeNotifications();
+  TaskProvider(FlutterLocalNotificationsPlugin plugin)
+      : _notificationService = NotificationService(plugin) {
+    _notificationService.initialize();
   }
   List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
 
   int get totalPoints => _pointsManager.totalPoints;
 
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
-
-  // Initialize notifications
-  void _initializeNotifications() {
-    log('Initializing notifications...'); // Debug log
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings(
-            'icon'); // Ensure icon.png exists in res/drawable folder
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-
-    flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (response) {
-        log('Notification clicked with payload: ${response.payload}'); // Debug log for clicks
-      },
-    );
-  }
-
-  // Helper method to send notifications
-  Future<void> _sendNotification(String title, String body) async {
-    log('Attempting to send notification: $title - $body'); // Debug log
-
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails('channel_id', 'channel_name',
-            channelDescription: 'Task Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: 'icon', // Use the icon from the drawable folder
-            showWhen: true);
-
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    try {
-      await flutterLocalNotificationsPlugin.show(
-        0, // Notification ID
-        title,
-        body,
-        platformChannelSpecifics,
-      );
-      log('Notification sent successfully.'); // Debug log
-    } catch (e) {
-      log('Error sending notification: $e'); // Log error
-    }
-  }
 
   /// This function retrieves the list of tasks with their `DateTime` fields
   /// (such as `creationDate`, `deadline`, and `nextOccurrence`) converted
@@ -102,23 +56,35 @@ class TaskProvider extends ChangeNotifier {
       };
 
   void addTask(Task task) {
-    // Calculate flexible deadline if no specific deadline is provided
+    // Ensure deadlines are UTC
+    task = task.copyWith(
+      deadline: task.deadline?.toUtc(),
+      alertFrequency: task.alertFrequency, // Handle alert frequency
+      customReminder: task.customReminder, // Handle custom reminder
+    );
+
     if (task.flexibleDeadline != null && task.deadline == null) {
       final localDeadline =
           calculateDeadlineFromFlexible(task.flexibleDeadline!);
-      task = task.copyWith(deadline: localDeadline?.toUtc()); // Convert to UTC
-    } else {
-      task = task.copyWith(deadline: task.deadline?.toUtc()); // Ensure UTC
+      task = task.copyWith(deadline: localDeadline?.toUtc());
     }
 
-    // Handle repeating tasks
-    if (task.isRepeating) {
-      final repeatingGroupId = const Uuid().v4(); // Generate unique group ID
-      final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
+    if (!task.isCompleted && task.deadline != null) {
+      _notificationService.scheduleNotification(
+        title: 'Task Reminder',
+        body: 'Don\'t forget: "${task.title}" is due soon!',
+        deadline: task.deadline!,
+        alertFrequency: task.alertFrequency,
+        customReminder: task.customReminder,
+      );
+    }
 
+    if (task.isRepeating) {
+      final repeatingGroupId = const Uuid().v4();
+      final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
       _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
-      _tasks.add(task); // Add non-repeating task
+      _tasks.add(task);
     }
 
     notifyListeners();
@@ -128,15 +94,16 @@ class TaskProvider extends ChangeNotifier {
     Task task, {
     required String title,
     required String description,
-    DateTime? selectedDeadline, // Raw input from UI
+    DateTime? selectedDeadline,
     String? flexibleDeadline,
     bool? isRepeating,
     String? repeatInterval,
     int? customRepeatDays,
     List<Attachment>? attachments,
     int? points,
+    String? alertFrequency, // Add alert frequency
+    Map<String, dynamic>? customReminder, // Add custom reminder
   }) {
-    // Calculate the deadline, either specific or from flexibleDeadline
     final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ??
         (flexibleDeadline != null
             ? calculateDeadlineFromFlexible(flexibleDeadline)?.toUtc()
@@ -145,16 +112,29 @@ class TaskProvider extends ChangeNotifier {
     final updatedTask = task.copyWith(
       title: title,
       description: description,
-      deadline: calculatedDeadline, // Ensure UTC
+      deadline: calculatedDeadline,
       flexibleDeadline: flexibleDeadline,
       points: points ?? task.points,
       isRepeating: isRepeating ?? task.isRepeating,
       repeatInterval: repeatInterval ?? task.repeatInterval,
       customRepeatDays: customRepeatDays ?? task.customRepeatDays,
       attachments: attachments ?? task.attachments,
-      updatedAt: DateTime.now().toUtc(), // Update the timestamp in UTC
+      alertFrequency:
+          alertFrequency ?? task.alertFrequency, // Update alert frequency
+      customReminder:
+          customReminder ?? task.customReminder, // Update custom reminder
+      updatedAt: DateTime.now().toUtc(),
     );
 
+    if (!task.isCompleted && calculatedDeadline != null) {
+      _notificationService.scheduleNotification(
+        title: 'Updated Reminder',
+        body: 'Updated: "${task.title}" is due soon!',
+        deadline: calculatedDeadline,
+        alertFrequency: task.alertFrequency,
+        customReminder: task.customReminder,
+      );
+    }
     int index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
@@ -169,7 +149,7 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-// Updated _generateRepeatingTasks to accept a limit parameter
+  // Updated _generateRepeatingTasks to accept a limit parameter
   void _generateRepeatingTasks(Task task, String? groupId, {DateTime? limit}) {
     if (!task.isRepeating || task.repeatInterval == null) return;
 
@@ -426,7 +406,7 @@ class TaskProvider extends ChangeNotifier {
         'Task "${task.title}" completed',
       );
       _notificationThrottler.sendThrottledNotification(
-        sendNotification: _sendNotification,
+        sendNotification: _notificationService.sendNotification,
         title: 'Hurrah!',
         body: 'You completed the task: "${task.title}"!',
       );

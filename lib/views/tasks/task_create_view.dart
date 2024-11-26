@@ -3,8 +3,11 @@ import 'dart:developer';
 import 'package:app/models/attachment.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
+import 'package:app/utils/reminder_utils.dart';
 import 'package:app/views/home/home_view.dart';
+import 'package:app/views/tasks/components/alert_frequency_dropdown.dart';
 import 'package:app/views/tasks/components/custom_interval_input.dart';
+import 'package:app/views/tasks/components/custom_reminder_input.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
 import 'package:app/views/tasks/components/flexible_deadline_dropdown.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
@@ -42,6 +45,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   String? repeatInterval; // E.g., "daily", "weekly", etc.
   int? customRepeatDays; // For custom intervals
   DateTime? nextOccurrence; // Next occurrence of the repeating task
+  String? alertFrequency = "5_minutes"; // Default valid value
+  int? customReminderQuantity;
+  String? customReminderUnit;
+  Map<String, dynamic>? customReminder = {"unit": "hours", "quantity": 1};
 
   @override
   void initState() {
@@ -53,6 +60,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       attachments = List.from(widget.task!.attachments);
       pointsController.text = widget.task!.points.toString();
       lastValidPoints = widget.task!.points;
+
+      // Initialize custom reminder variables if they exist
+      if (widget.task!.customReminder != null) {
+        customReminderQuantity = widget.task!.customReminder!['quantity'];
+        customReminderUnit = widget.task!.customReminder!['unit'];
+      }
     }
   }
 
@@ -114,6 +127,20 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         (selectedDeadline != null || flexibleDeadline != null)) {
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
+      // Validate alert frequency
+      if (alertFrequency == "custom" &&
+          (customReminder == null ||
+              customReminder!['quantity'] == null ||
+              customReminder!['unit'] == null)) {
+        log('Invalid custom reminder configuration');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStr.customReminderErrorMessage)),
+        );
+        return;
+      }
+      final customReminderConfig =
+          (alertFrequency == "custom") ? customReminder : null;
+
       if (widget.task == null) {
         final newTask = Task(
           id: const Uuid().v4(),
@@ -121,6 +148,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           description: descriptionTaskController.text,
           deadline: selectedDeadline,
           flexibleDeadline: flexibleDeadline,
+          alertFrequency: alertFrequency, // Save alert frequency
+          customReminder: customReminderConfig, // Save custom reminder
           isRepeating: isRepeating,
           repeatInterval: repeatInterval,
           customRepeatDays: customRepeatDays,
@@ -142,6 +171,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             description: descriptionTaskController.text,
             selectedDeadline: selectedDeadline,
             flexibleDeadline: flexibleDeadline,
+            alertFrequency: alertFrequency,
+            customReminder: customReminderConfig,
             isRepeating: isRepeating,
             repeatInterval: repeatInterval,
             customRepeatDays: customRepeatDays,
@@ -407,7 +438,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
-                  : 'Select Date',
+                  : AppStr.selectDate, // Use AppStr for "Select Date"
               onTap: () {
                 DatePicker.showDatePicker(context, onConfirm: (date) {
                   setState(() {
@@ -426,7 +457,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
-                  : 'Select Time',
+                  : AppStr.selectDate, // Use AppStr for "Select Date"
               onTap: () {
                 DatePicker.showTimePicker(context, onConfirm: (time) {
                   setState(() {
@@ -453,6 +484,31 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             _buildRepeatIntervalDropdown(textTheme),
             const SizedBox(height: 16),
             _buildCustomIntervalInput(textTheme),
+          ],
+          const SizedBox(height: 16),
+          AlertFrequencyDropdown(
+            alertFrequency: alertFrequency,
+            onFrequencyChanged: (value) {
+              setState(() {
+                alertFrequency = value;
+                if (value != "custom") {
+                  customReminder = null;
+                } else {
+                  customReminder = {"quantity": 1, "unit": "hours"};
+                }
+              });
+            },
+          ),
+          if (alertFrequency == "custom") ...[
+            const SizedBox(height: 16),
+            CustomReminderInput(
+              customReminder: customReminder,
+              onCustomReminderChanged: (value) {
+                setState(() {
+                  customReminder = validateCustomReminder(value);
+                });
+              },
+            ),
           ],
         ],
       ),
