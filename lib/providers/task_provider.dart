@@ -1,8 +1,12 @@
 import 'dart:developer';
+import 'package:app/helpers/notification_helpers.dart';
+import 'package:app/helpers/task_helpers.dart';
 import 'package:app/services/notification_service.dart';
+import 'package:app/services/research_service.dart';
 import 'package:app/utils/datetime_utils.dart';
 import 'package:app/utils/deadline_utils.dart';
 import 'package:app/models/points_history_entry.dart';
+import 'package:app/utils/keyword_generator.dart';
 import 'package:app/utils/notification_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
@@ -15,13 +19,16 @@ import 'package:uuid/uuid.dart';
 
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
+  final ResearchService _researchService;
   final NotificationService _notificationService;
   final PointsManager _pointsManager =
       PointsManager(); // PointsManager instance
   final NotificationThrottler _notificationThrottler = NotificationThrottler();
 
-  TaskProvider(FlutterLocalNotificationsPlugin plugin)
-      : _notificationService = NotificationService(plugin) {
+  TaskProvider(FlutterLocalNotificationsPlugin plugin,
+      {required ResearchService researchService})
+      : _notificationService = NotificationService(plugin),
+        _researchService = researchService {
     _notificationService.initialize();
   }
   List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
@@ -55,20 +62,27 @@ class TaskProvider extends ChangeNotifier {
         }).toList();
       };
 
-  void addTask(Task task) {
-    // Ensure deadlines are UTC
+  void addTask(Task task) async {
+    // Handle research-specific tasks
+    if (task.category == "Research") {
+      task = await _prepareResearchTask(task);
+    }
+
+    // Ensure deadlines are in UTC
     task = task.copyWith(
       deadline: task.deadline?.toUtc(),
       alertFrequency: task.alertFrequency, // Handle alert frequency
       customReminder: task.customReminder, // Handle custom reminder
     );
 
+    // Handle flexible deadlines
     if (task.flexibleDeadline != null && task.deadline == null) {
       final localDeadline =
           calculateDeadlineFromFlexible(task.flexibleDeadline!);
       task = task.copyWith(deadline: localDeadline?.toUtc());
     }
 
+    // Schedule notification if the task is incomplete and has a deadline
     if (!task.isCompleted && task.deadline != null) {
       _notificationService.scheduleNotification(
         title: 'Task Reminder',
@@ -79,15 +93,41 @@ class TaskProvider extends ChangeNotifier {
       );
     }
 
+    // Handle repeating tasks
     if (task.isRepeating) {
       final repeatingGroupId = const Uuid().v4();
       final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
       _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
+      // Add single instance task to the list
       _tasks.add(task);
     }
 
+    // Notify listeners about the new task
     notifyListeners();
+  }
+
+  Future<Task> _prepareResearchTask(Task task) async {
+    // Generate Keywords
+    final generatedKeywords =
+        KeywordGenerator.generate(task.title, task.description);
+    task = task.copyWith(keywords: generatedKeywords);
+
+    // Fetch Related Research Papers
+    try {
+      final relatedPapers =
+          await _researchService.fetchRelatedResearch(task.keywords);
+      if (relatedPapers.isNotEmpty) {
+        task = task.copyWith(
+          suggestedPaper: relatedPapers[0]['title'],
+          suggestedPaperUrl: relatedPapers[0]['url'],
+        );
+      }
+    } catch (e) {
+      log("Error fetching research papers: $e");
+    }
+
+    return task;
   }
 
   void updateTask(
@@ -101,14 +141,34 @@ class TaskProvider extends ChangeNotifier {
     int? customRepeatDays,
     List<Attachment>? attachments,
     int? points,
-    String? alertFrequency, // Add alert frequency
-    Map<String, dynamic>? customReminder, // Add custom reminder
-  }) {
+    String? category, // Add category
+    List<String>? keywords, // Add keywords
+    String? alertFrequency,
+    Map<String, dynamic>? customReminder,
+  }) async {
+    // Calculate new deadline
     final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ??
-        (flexibleDeadline != null
-            ? calculateDeadlineFromFlexible(flexibleDeadline)?.toUtc()
-            : null);
+        calculateFlexibleDeadline(flexibleDeadline);
 
+    // Handle category change or research-related updates
+    if (category != null && category == "Research") {
+      task = await _prepareResearchTaskForUpdate(
+        task: task,
+        title: title,
+        description: description,
+        category: category,
+        keywords: keywords,
+      );
+    } else if (category != null && category != task.category) {
+      task = task.copyWith(
+        category: category,
+        keywords: [], // Clear keywords for non-research tasks
+        suggestedPaper: null,
+        suggestedPaperUrl: null,
+      );
+    }
+
+    // Update the task
     final updatedTask = task.copyWith(
       title: title,
       description: description,
@@ -119,26 +179,26 @@ class TaskProvider extends ChangeNotifier {
       repeatInterval: repeatInterval ?? task.repeatInterval,
       customRepeatDays: customRepeatDays ?? task.customRepeatDays,
       attachments: attachments ?? task.attachments,
-      alertFrequency:
-          alertFrequency ?? task.alertFrequency, // Update alert frequency
-      customReminder:
-          customReminder ?? task.customReminder, // Update custom reminder
+      category: category ?? task.category,
+      keywords: keywords ?? task.keywords,
+      alertFrequency: alertFrequency ?? task.alertFrequency,
+      customReminder: customReminder ?? task.customReminder,
       updatedAt: DateTime.now().toUtc(),
     );
 
-    if (!task.isCompleted && calculatedDeadline != null) {
-      _notificationService.scheduleNotification(
-        title: 'Updated Reminder',
-        body: 'Updated: "${task.title}" is due soon!',
-        deadline: calculatedDeadline,
-        alertFrequency: task.alertFrequency,
-        customReminder: task.customReminder,
-      );
-    }
-    int index = _tasks.indexWhere((t) => t.id == task.id);
+    // Schedule notification
+    scheduleTaskNotification(
+      notificationService: _notificationService,
+      task: updatedTask,
+      title: 'Updated Reminder',
+    );
+
+    // Find the task index and update it
+    final index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
 
+      // Regenerate repeating tasks if needed
       if (updatedTask.isRepeating) {
         _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
       }
@@ -147,6 +207,42 @@ class TaskProvider extends ChangeNotifier {
     } else {
       log('Task with ID ${task.id} not found for update.');
     }
+  }
+
+  Future<Task> _prepareResearchTaskForUpdate({
+    required Task task,
+    required String title,
+    required String description,
+    required String category,
+    List<String>? keywords,
+  }) async {
+    // Regenerate keywords if not explicitly provided
+    final newKeywords =
+        keywords ?? KeywordGenerator.generate(title, description);
+
+    task = task.copyWith(
+      category: category,
+      keywords: newKeywords,
+    );
+
+    // Fetch related research papers if necessary
+    try {
+      final relatedPapers =
+          await _researchService.fetchRelatedResearch(newKeywords);
+      if (relatedPapers.isNotEmpty) {
+        task = task.copyWith(
+          suggestedPaper: relatedPapers[0]['title'],
+          suggestedPaperUrl: relatedPapers[0]['url'],
+        );
+      } else {
+        task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
+      }
+    } catch (e) {
+      log("Error fetching research papers: $e");
+      task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
+    }
+
+    return task;
   }
 
   // Updated _generateRepeatingTasks to accept a limit parameter

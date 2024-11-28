@@ -1,4 +1,5 @@
 // views/tasks/task_detail_view.dart
+import 'package:app/services/research_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -8,9 +9,10 @@ import 'package:app/providers/task_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:app/views/tasks/task_create_view.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:app/views/tasks/subtasks/subtask_view.dart';
 import 'package:app/utils/app_colors.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class TaskDetailView extends StatelessWidget {
   final String taskId;
@@ -55,7 +57,11 @@ class TaskDetailView extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TaskCreateView(task: task),
+                  builder: (context) => TaskCreateView(
+                    task: task,
+                    researchService:
+                        Provider.of<ResearchService>(context, listen: false),
+                  ),
                 ),
               );
             },
@@ -171,6 +177,74 @@ class TaskDetailView extends StatelessWidget {
               '${task.points} pts',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            const SizedBox(height: 10),
+            const Divider(),
+            Text(
+              'Category:',
+              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            Text(
+              task.category,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            const Divider(),
+            Text(
+              'Keywords:',
+              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            if (task.keywords.isNotEmpty)
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: task.keywords
+                    .map((keyword) => Chip(
+                          label: Text(keyword),
+                          backgroundColor:
+                              AppColors.primaryColor.withOpacity(0.1),
+                          labelStyle:
+                              const TextStyle(color: AppColors.primaryColor),
+                        ))
+                    .toList(),
+              )
+            else
+              Text(
+                "No keywords available",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            const SizedBox(height: 10),
+            const Divider(),
+            Text(
+              'Suggested Research Paper:',
+              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            if (task.suggestedPaper != null && task.suggestedPaperUrl != null)
+              InkWell(
+                onTap: () async {
+                  launchUrl(Uri.parse(task.suggestedPaperUrl!));
+                },
+                child: Text(
+                  task.suggestedPaper!,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: AppColors.primaryColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                ),
+              )
+            else
+              Text(
+                "No suggested research paper available",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             const SizedBox(height: 10),
             const Divider(),
             Row(

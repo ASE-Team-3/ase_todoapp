@@ -1,7 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--Flutter Notification Permissions-->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!--open URL Permission-->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="app"
         android:name="${applicationName}"

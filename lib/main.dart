@@ -1,11 +1,13 @@
 import 'package:app/initialize_timezones.dart';
 import 'package:app/providers/task_provider.dart';
+import 'package:app/services/research_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize timezone database
@@ -13,11 +15,28 @@ void main() {
   // Initialize FlutterLocalNotificationsPlugin
   final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
+  // Scopus Search API
+
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Error loading .env: $e");
+  }
+
+  final researchService = ResearchService(
+    apiUrl: dotenv.env['SCOPUS_BASE_URL'] ?? '',
+    apiKey: dotenv.env['SCOPUS_API_KEY'] ?? '',
+  );
+
   runApp(
     MultiProvider(
       providers: [
+        Provider<ResearchService>.value(value: researchService),
         ChangeNotifierProvider(
-          create: (_) => TaskProvider(flutterLocalNotificationsPlugin),
+          create: (_) => TaskProvider(
+            flutterLocalNotificationsPlugin,
+            researchService: researchService,
+          ),
         ),
       ],
       child: const MyApp(),

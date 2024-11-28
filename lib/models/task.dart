@@ -25,6 +25,10 @@ class Task {
   List<SubTask> subTasks; // List of SubTasks
   int points; // New points attribute
   final Map<String, dynamic>? customReminder; // New field for custom reminders
+  final String category; // Category of the task (e.g., Research, Work, etc.)
+  List<String> keywords; // Keywords for research tasks
+  final String? suggestedPaper;
+  final String? suggestedPaperUrl;
 
   Task({
     required this.title,
@@ -46,11 +50,16 @@ class Task {
     List<SubTask>? subTasks,
     this.points = 0, // Initialize points to 0
     this.customReminder,
+    this.category = "General", // Default category
+    List<String>? keywords, // Initialize keywords
+    this.suggestedPaper,
+    this.suggestedPaperUrl,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate?.toUtc() ?? DateTime.now().toUtc(),
         updatedAt = updatedAt?.toUtc() ?? DateTime.now().toUtc(),
         attachments = attachments ?? [],
-        subTasks = subTasks ?? [];
+        subTasks = subTasks ?? [],
+        keywords = keywords ?? []; // Initialize empty keyword list if null
 
   Task copyWith({
     String? id,
@@ -72,6 +81,10 @@ class Task {
     List<SubTask>? subTasks,
     int? points, // Add points in copyWith
     Map<String, dynamic>? customReminder,
+    String? category, // Include category in copyWith
+    List<String>? keywords, // Include keywords in copyWith
+    String? suggestedPaper,
+    String? suggestedPaperUrl,
   }) {
     return Task(
       id: id ?? this.id,
@@ -98,6 +111,10 @@ class Task {
       subTasks: subTasks ?? this.subTasks,
       points: points ?? this.points, // Update points
       customReminder: customReminder ?? this.customReminder,
+      category: category ?? this.category, // Update category
+      keywords: keywords ?? this.keywords, // Update keywords
+      suggestedPaper: suggestedPaper ?? this.suggestedPaper,
+      suggestedPaperUrl: suggestedPaperUrl ?? this.suggestedPaperUrl,
     );
   }
 }

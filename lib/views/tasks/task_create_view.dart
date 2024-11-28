@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:developer';
 import 'package:app/models/attachment.dart';
+import 'package:app/services/research_service.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:app/utils/reminder_utils.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:app/views/tasks/components/alert_frequency_dropdown.dart';
+import 'package:app/views/tasks/components/category_dropdown.dart';
 import 'package:app/views/tasks/components/custom_interval_input.dart';
 import 'package:app/views/tasks/components/custom_reminder_input.dart';
 import 'package:app/views/tasks/components/date_time_selection.dart';
@@ -13,6 +15,7 @@ import 'package:app/views/tasks/components/flexible_deadline_dropdown.dart';
 import 'package:app/views/tasks/components/rep_textfield.dart';
 import 'package:app/views/tasks/components/repeat_interval_dropdown.dart';
 import 'package:app/views/tasks/components/repeating_toggle.dart';
+import 'package:app/views/tasks/components/research_section.dart';
 import 'package:app/views/tasks/widget/task_view_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -25,8 +28,13 @@ import 'package:uuid/uuid.dart';
 
 class TaskCreateView extends StatefulWidget {
   final Task? task;
+  final ResearchService researchService; // Add researchService dependency
 
-  const TaskCreateView({super.key, this.task});
+  const TaskCreateView({
+    super.key,
+    this.task,
+    required this.researchService,
+  });
 
   @override
   State<TaskCreateView> createState() => _TaskCreateViewState();
@@ -50,6 +58,56 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   String? customReminderUnit;
   Map<String, dynamic>? customReminder = {"unit": "hours", "quantity": 1};
 
+  // Add state variables
+  String? selectedCategory = "General"; // Default category
+  List<String> researchKeywords = [];
+  String? suggestedPaper;
+  String? suggestedPaperUrl;
+
+  // Generate Keywords from Task Title and Description
+  void generateResearchKeywords() {
+    final title = titleTaskController.text.trim();
+    final description = descriptionTaskController.text.trim();
+
+    if (title.isNotEmpty || description.isNotEmpty) {
+      setState(() {
+        researchKeywords = generateKeywords(title, description);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text("Please fill in the task title or description first.")),
+      );
+    }
+  }
+
+  // Add Keyword
+  void addKeyword(String keyword) {
+    setState(() {
+      if (!researchKeywords.contains(keyword)) {
+        researchKeywords.add(keyword);
+      }
+    });
+  }
+
+  // Remove Keyword
+  void removeKeyword(String keyword) {
+    setState(() {
+      researchKeywords.remove(keyword);
+    });
+  }
+
+  List<String> generateKeywords(String title, String description) {
+    // Example: Simple keyword extraction (replace with real logic or API)
+    final allText = "$title $description".toLowerCase();
+    final words =
+        allText.split(RegExp(r'\s+')).toSet(); // Split into unique words
+    final keywords =
+        words.where((word) => word.length > 3).toList(); // Filter short words
+    return keywords.take(5).toList(); // Return the top 5 keywords
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +118,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       attachments = List.from(widget.task!.attachments);
       pointsController.text = widget.task!.points.toString();
       lastValidPoints = widget.task!.points;
+      researchKeywords = widget.task!.keywords;
+      suggestedPaper = widget.task!.suggestedPaper;
+      suggestedPaperUrl = widget.task!.suggestedPaperUrl;
 
       // Initialize custom reminder variables if they exist
       if (widget.task!.customReminder != null) {
@@ -119,7 +180,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  void _saveOrUpdateTask() {
+  void _saveOrUpdateTask() async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
 
     if (titleTaskController.text.isNotEmpty &&
@@ -141,13 +202,23 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       final customReminderConfig =
           (alertFrequency == "custom") ? customReminder : null;
 
+      // Prepare common task fields
+      final String category = selectedCategory ?? "General";
+      final List<String> keywords =
+          category == "Research" ? researchKeywords : [];
+      final DateTime? deadline = selectedDeadline;
+      final String? flexibleDeadlineOption = flexibleDeadline;
+
       if (widget.task == null) {
+        // Creating a new task
         final newTask = Task(
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          deadline: selectedDeadline,
-          flexibleDeadline: flexibleDeadline,
+          category: category, // Save selected category
+          keywords: keywords, // Save keywords
+          deadline: deadline,
+          flexibleDeadline: flexibleDeadlineOption,
           alertFrequency: alertFrequency, // Save alert frequency
           customReminder: customReminderConfig, // Save custom reminder
           isRepeating: isRepeating,
@@ -157,33 +228,75 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           attachments: attachments,
           points: enteredPoints,
         );
-        taskProvider.addTask(newTask);
-        Navigator.pop(context);
+
+        try {
+          taskProvider.addTask(newTask);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Task added successfully!")),
+          );
+          Navigator.pop(context);
+        } catch (e) {
+          log("Error adding task: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to add the task.")),
+          );
+        }
       } else {
         // Updating an existing task
-        if (widget.task!.isRepeating) {
-          _showUpdateOptionsDialog(taskProvider); // Show update options dialog
-        } else {
-          // Normal update for non-repeating tasks
-          taskProvider.updateTask(
-            widget.task!,
-            title: titleTaskController.text,
-            description: descriptionTaskController.text,
-            selectedDeadline: selectedDeadline,
-            flexibleDeadline: flexibleDeadline,
-            alertFrequency: alertFrequency,
-            customReminder: customReminderConfig,
-            isRepeating: isRepeating,
-            repeatInterval: repeatInterval,
-            customRepeatDays: customRepeatDays,
-            attachments: attachments,
-            points: enteredPoints,
+        final updatedTask = widget.task!.copyWith(
+          title: titleTaskController.text,
+          description: descriptionTaskController.text,
+          category: category,
+          keywords: keywords,
+          deadline: deadline?.toUtc(),
+          flexibleDeadline: flexibleDeadlineOption,
+          alertFrequency: alertFrequency,
+          customReminder: customReminderConfig,
+          isRepeating: isRepeating,
+          repeatInterval: repeatInterval,
+          customRepeatDays: customRepeatDays,
+          attachments: attachments,
+          points: enteredPoints,
+        );
+
+        try {
+          if (widget.task!.isRepeating) {
+            // Handle repeating task updates
+            _showUpdateOptionsDialog(taskProvider);
+          } else {
+            // Handle normal task updates
+            taskProvider.updateTask(
+              widget.task!,
+              title: updatedTask.title,
+              description: updatedTask.description,
+              category: updatedTask.category,
+              keywords: updatedTask.keywords,
+              selectedDeadline: updatedTask.deadline,
+              flexibleDeadline: updatedTask.flexibleDeadline,
+              alertFrequency: updatedTask.alertFrequency,
+              customReminder: updatedTask.customReminder,
+              isRepeating: updatedTask.isRepeating,
+              repeatInterval: updatedTask.repeatInterval,
+              customRepeatDays: updatedTask.customRepeatDays,
+              attachments: updatedTask.attachments,
+              points: updatedTask.points,
+            );
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Task updated successfully!")),
           );
           _resetFields();
           Navigator.pop(context);
+        } catch (e) {
+          log("Error updating task: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update the task.")),
+          );
         }
       }
     } else {
+      // Validation error
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
@@ -357,6 +470,66 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Category Dropdown
+          CategoryDropdown(
+            selectedCategory: selectedCategory,
+            onCategoryChanged: (value) {
+              setState(() {
+                selectedCategory = value;
+                if (selectedCategory != "Research") {
+                  researchKeywords.clear(); // Reset keywords
+                }
+              });
+            },
+          ),
+
+          // Conditionally show Research Section
+          if (selectedCategory == "Research") ...[
+            ResearchSection(
+              keywords: researchKeywords,
+              onAddKeyword: (keyword) {
+                setState(() {
+                  if (!researchKeywords.contains(keyword)) {
+                    researchKeywords.add(keyword);
+                  }
+                });
+              },
+              onRemoveKeyword: (keyword) {
+                setState(() {
+                  researchKeywords.remove(keyword);
+                });
+              },
+              onGenerateKeywords: () {
+                setState(() {
+                  researchKeywords = generateKeywords(
+                    titleTaskController.text.trim(),
+                    descriptionTaskController.text.trim(),
+                  );
+                });
+              },
+              onRefreshSuggestions: () async {
+                try {
+                  final suggestions = await widget.researchService
+                      .fetchRelatedResearch(researchKeywords);
+                  setState(() {
+                    if (suggestions.isNotEmpty) {
+                      suggestedPaper = suggestions[0]['title'];
+                      suggestedPaperUrl = suggestions[0]['url'];
+                    }
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text("Failed to refresh research suggestions")),
+                  );
+                }
+              },
+              suggestedPaper: suggestedPaper,
+              suggestedPaperUrl: suggestedPaperUrl,
+            ),
+          ],
+
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 20),
             child: Text(AppStr.titleOfTitleTextField,
