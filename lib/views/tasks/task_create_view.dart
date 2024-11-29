@@ -470,66 +470,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Category Dropdown
-          CategoryDropdown(
-            selectedCategory: selectedCategory,
-            onCategoryChanged: (value) {
-              setState(() {
-                selectedCategory = value;
-                if (selectedCategory != "Research") {
-                  researchKeywords.clear(); // Reset keywords
-                }
-              });
-            },
-          ),
-
-          // Conditionally show Research Section
-          if (selectedCategory == "Research") ...[
-            ResearchSection(
-              keywords: researchKeywords,
-              onAddKeyword: (keyword) {
-                setState(() {
-                  if (!researchKeywords.contains(keyword)) {
-                    researchKeywords.add(keyword);
-                  }
-                });
-              },
-              onRemoveKeyword: (keyword) {
-                setState(() {
-                  researchKeywords.remove(keyword);
-                });
-              },
-              onGenerateKeywords: () {
-                setState(() {
-                  researchKeywords = generateKeywords(
-                    titleTaskController.text.trim(),
-                    descriptionTaskController.text.trim(),
-                  );
-                });
-              },
-              onRefreshSuggestions: () async {
-                try {
-                  final suggestions = await widget.researchService
-                      .fetchRelatedResearch(researchKeywords);
-                  setState(() {
-                    if (suggestions.isNotEmpty) {
-                      suggestedPaper = suggestions[0]['title'];
-                      suggestedPaperUrl = suggestions[0]['url'];
-                    }
-                  });
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text("Failed to refresh research suggestions")),
-                  );
-                }
-              },
-              suggestedPaper: suggestedPaper,
-              suggestedPaperUrl: suggestedPaperUrl,
-            ),
-          ],
-
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 20),
             child: Text(AppStr.titleOfTitleTextField,
@@ -681,6 +621,68 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   customReminder = validateCustomReminder(value);
                 });
               },
+            ),
+          ],
+          const SizedBox(height: 16),
+
+          // Category Dropdown
+          CategoryDropdown(
+            selectedCategory: selectedCategory,
+            onCategoryChanged: (value) {
+              setState(() {
+                selectedCategory = value;
+                if (selectedCategory != "Research") {
+                  researchKeywords.clear(); // Reset keywords
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Conditionally show Research Section
+          if (selectedCategory == "Research") ...[
+            ResearchSection(
+              keywords: researchKeywords,
+              onAddKeyword: (keyword) {
+                setState(() {
+                  if (!researchKeywords.contains(keyword)) {
+                    researchKeywords.add(keyword);
+                  }
+                });
+              },
+              onRemoveKeyword: (keyword) {
+                setState(() {
+                  researchKeywords.remove(keyword);
+                });
+              },
+              onGenerateKeywords: () {
+                setState(() {
+                  researchKeywords = generateKeywords(
+                    titleTaskController.text.trim(),
+                    descriptionTaskController.text.trim(),
+                  );
+                });
+              },
+              onRefreshSuggestions: () async {
+                try {
+                  final suggestions = await widget.researchService
+                      .fetchRelatedResearch(researchKeywords);
+                  setState(() {
+                    if (suggestions.isNotEmpty) {
+                      suggestedPaper = suggestions[0]['title'];
+                      suggestedPaperUrl = suggestions[0]['url'];
+                    }
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text("Failed to refresh research suggestions")),
+                  );
+                }
+              },
+              suggestedPaper: suggestedPaper,
+              suggestedPaperUrl: suggestedPaperUrl,
             ),
           ],
         ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app/utils/app_colors.dart';
 
 class ResearchSection extends StatelessWidget {
   final List<String> keywords;
@@ -35,14 +36,29 @@ class ResearchSection extends StatelessWidget {
               child: TextField(
                 controller: keywordController,
                 decoration: InputDecoration(
-                  labelText: "Add a keyword",
+                  labelText: "Add a Keyword",
+                  labelStyle: const TextStyle(color: AppColors.primaryColor),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.primaryColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                        color: AppColors.primaryColor, width: 2),
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
               onPressed: () {
                 if (keywordController.text.trim().isNotEmpty) {
                   onAddKeyword(keywordController.text.trim());
@@ -57,6 +73,14 @@ class ResearchSection extends StatelessWidget {
 
         // Generate Keywords Button
         ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           onPressed: onGenerateKeywords,
           icon: const Icon(Icons.auto_fix_high),
           label: const Text("Generate Keywords"),
@@ -69,7 +93,12 @@ class ResearchSection extends StatelessWidget {
           runSpacing: 4.0,
           children: keywords
               .map((keyword) => Chip(
-                    label: Text(keyword),
+                    label: Text(
+                      keyword,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+                    deleteIconColor: Colors.red,
                     onDeleted: () => onRemoveKeyword(keyword),
                   ))
               .toList(),
@@ -81,11 +110,20 @@ class ResearchSection extends StatelessWidget {
           Card(
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: ListTile(
-              title: Text(suggestedPaper!),
+              title: Text(
+                suggestedPaper!,
+                style: const TextStyle(
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               subtitle: const Text("Tap to view the full research paper."),
               trailing: IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh, color: AppColors.primaryColor),
                 onPressed: onRefreshSuggestions,
               ),
               onTap: () {
@@ -99,8 +137,18 @@ class ResearchSection extends StatelessWidget {
           Center(
             child: Column(
               children: [
-                const Text("No research suggestion available."),
+                const Text(
+                  "No research suggestion available.",
+                  style: TextStyle(color: Colors.black54),
+                ),
                 ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                   onPressed: onRefreshSuggestions,
                   icon: const Icon(Icons.refresh),
                   label: const Text("Refresh Suggestions"),
