@@ -191,63 +191,78 @@ class TaskDetailView extends StatelessWidget {
               task.category,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              AppStr.keywordsLabel,
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            if (task.keywords.isNotEmpty)
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
-                children: task.keywords
-                    .map((keyword) => Chip(
-                          label: Text(keyword),
-                          backgroundColor:
-                              AppColors.primaryColor.withOpacity(0.1),
-                          labelStyle:
-                              const TextStyle(color: AppColors.primaryColor),
-                        ))
-                    .toList(),
-              )
-            else
+
+            // Keywords (Only for Research category)
+            if (task.category == "Research") ...[
+              const SizedBox(height: 10),
+              const Divider(),
               Text(
-                AppStr.noKeywordsMessage,
-                style: Theme.of(context).textTheme.bodyMedium,
+                AppStr.keywordsLabel,
+                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      color: AppColors.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              AppStr.suggestedPaperLabel,
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            if (task.suggestedPaper != null && task.suggestedPaperUrl != null)
-              InkWell(
-                onTap: () async {
-                  launchUrl(Uri.parse(task.suggestedPaperUrl!));
-                },
-                child: Text(
-                  task.suggestedPaper!,
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                        color: AppColors.primaryColor,
-                        decoration: TextDecoration.underline,
-                      ),
+              if (task.keywords.isNotEmpty)
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 4.0,
+                  children: task.keywords
+                      .map((keyword) => Chip(
+                            label: Text(keyword),
+                            backgroundColor:
+                                AppColors.primaryColor.withOpacity(0.1),
+                            labelStyle:
+                                const TextStyle(color: AppColors.primaryColor),
+                          ))
+                      .toList(),
+                )
+              else
+                Text(
+                  AppStr.noKeywordsMessage,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              )
-            else
+            ],
+
+            // Suggested Paper (Only for Research category)
+            if (task.category == "Research") ...[
+              const SizedBox(height: 10),
+              const Divider(),
               Text(
-                AppStr.noSuggestedPaperMessage,
-                style: Theme.of(context).textTheme.bodyMedium,
+                AppStr.suggestedPaperLabel,
+                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      color: AppColors.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
+              if (task.suggestedPaper != null &&
+                  task.suggestedPaperUrl != null &&
+                  task.suggestedPaper != "No title available" &&
+                  task.suggestedPaperUrl != "No DOI available")
+                InkWell(
+                  onTap: () async {
+                    final url = Uri.parse(task.suggestedPaperUrl!);
+                    await launchUrl(url);
+                  },
+                  child: Text(
+                    task.suggestedPaper!,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          color: AppColors.primaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
+                )
+              else
+                Text(
+                  task.suggestedPaper ?? AppStr.noSuggestedPaperMessage,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+            ],
+
             const SizedBox(height: 10),
             const Divider(),
+
+            // Completed Checkbox
             Row(
               children: [
                 Text(
