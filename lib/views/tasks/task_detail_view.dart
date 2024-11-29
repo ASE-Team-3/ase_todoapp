@@ -1,5 +1,6 @@
 // views/tasks/task_detail_view.dart
 import 'package:app/services/research_service.dart';
+import 'package:app/utils/app_str.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -28,8 +29,8 @@ class TaskDetailView extends StatelessWidget {
       orElse: () {
         return Task(
           id: taskId,
-          title: 'Task Not Found',
-          description: 'This task does not exist.',
+          title: AppStr.taskNotFoundTitle,
+          description: AppStr.taskNotFoundDescription,
           deadline: DateTime.now(),
           attachments: [],
         );
@@ -85,7 +86,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               icon: const Icon(Icons.list),
-              label: const Text("View Subtasks"),
+              label: const Text(AppStr.viewSubtasksButton),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 foregroundColor: Colors.white,
@@ -128,7 +129,7 @@ class TaskDetailView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Description:',
+              AppStr.taskDescriptionLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -141,7 +142,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Deadline:',
+              AppStr.deadlineLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -154,7 +155,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Created On:',
+              AppStr.creationDateLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -167,7 +168,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Reward Points:',
+              AppStr.rewardPointsLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -180,7 +181,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Category:',
+              AppStr.categoryLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -193,7 +194,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Keywords:',
+              AppStr.keywordsLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -215,13 +216,13 @@ class TaskDetailView extends StatelessWidget {
               )
             else
               Text(
-                "No keywords available",
+                AppStr.noKeywordsMessage,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              'Suggested Research Paper:',
+              AppStr.suggestedPaperLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -242,7 +243,7 @@ class TaskDetailView extends StatelessWidget {
               )
             else
               Text(
-                "No suggested research paper available",
+                AppStr.noSuggestedPaperMessage,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             const SizedBox(height: 10),
@@ -250,7 +251,7 @@ class TaskDetailView extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Completed:',
+                  AppStr.completedLabel,
                   style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                         color: AppColors.primaryColor,
                         fontWeight: FontWeight.bold,
@@ -285,7 +286,7 @@ class TaskDetailView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Attachments',
+              AppStr.attachmentsLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
                     color: AppColors.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -294,7 +295,7 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             ElevatedButton.icon(
               icon: const Icon(Icons.add),
-              label: const Text("Add Attachment"),
+              label: const Text(AppStr.addAttachmentLabel),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
                 foregroundColor: Colors.white,
@@ -362,9 +363,9 @@ class TaskDetailView extends StatelessWidget {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text("Delete Repeating Task"),
+            title: const Text(AppStr.deleteRepeatingTaskTitle),
             content: const Text(
-              "How would you like to delete this repeating task?",
+              AppStr.deleteRepeatingTaskContent,
             ),
             actions: [
               TextButton(
@@ -372,7 +373,7 @@ class TaskDetailView extends StatelessWidget {
                   taskProvider.deleteRepeatingTasks(task, option: "all");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
-                child: const Text("Delete All"),
+                child: const Text(AppStr.deleteAllButton),
               ),
               TextButton(
                 onPressed: () {
@@ -380,14 +381,14 @@ class TaskDetailView extends StatelessWidget {
                       option: "this_and_following");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
-                child: const Text("This and Following"),
+                child: const Text(AppStr.deleteThisAndFollowingButton),
               ),
               TextButton(
                 onPressed: () {
                   taskProvider.deleteRepeatingTasks(task, option: "only_this");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
-                child: const Text("Only This"),
+                child: const Text(AppStr.deleteOnlyThisButton),
               ),
             ],
           );
@@ -399,19 +400,19 @@ class TaskDetailView extends StatelessWidget {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text("Delete Task"),
-            content: const Text("Are you sure you want to delete this task?"),
+            title: const Text(AppStr.deleteTask),
+            content: const Text(AppStr.deleteTaskConfirmationMessage),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false), // No
-                child: const Text("No"),
+                child: const Text(AppStr.noButton),
               ),
               TextButton(
                 onPressed: () {
                   taskProvider.removeTask(task);
                   Navigator.popUntil(context, (route) => route.isFirst);
                 }, // Yes
-                child: const Text("Yes"),
+                child: const Text(AppStr.yesButton),
               ),
             ],
           );

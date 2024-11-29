@@ -50,6 +50,47 @@ class AppStr {
   static const days = "Days";
   static const weeks = "Weeks";
 
+  // Task Detail View:
+  // General Labels
+  static const String taskDetailsTitle = "Task Details";
+  static const String taskDescriptionLabel = "Description:";
+  static const String deadlineLabel = "Deadline:";
+  static const String creationDateLabel = "Created On:";
+  static const String rewardPointsLabel = "Reward Points:";
+  static const String categoryLabel = "Category:";
+  static const String keywordsLabel = "Keywords:";
+  static const String suggestedPaperLabel = "Suggested Research Paper:";
+  static const String completedLabel = "Completed:";
+
+  // Messages
+  static const String noKeywordsMessage = "No keywords available";
+  static const String noSuggestedPaperMessage =
+      "No suggested research paper available";
+  static const String couldNotOpenUrlMessage = "Could not open the URL";
+  static const String noUrlAvailableMessage =
+      "No URL available for this paper.";
+  static const String addAttachmentLabel = "Add Attachment";
+  static const String taskNotFoundTitle = "Task Not Found";
+  static const String taskNotFoundDescription = "This task does not exist.";
+
+  // Dialogs
+  static const String deleteRepeatingTaskTitle = "Delete Repeating Task";
+  static const String deleteRepeatingTaskContent =
+      "How would you like to delete this repeating task?";
+  static const String deleteTaskTitle = "Delete Task";
+  static const String deleteTaskConfirmationMessage =
+      "Are you sure you want to delete this task?";
+
+  // Buttons
+  static const String deleteAllButton = "Delete All";
+  static const String deleteThisAndFollowingButton = "This and Following";
+  static const String deleteOnlyThisButton = "Only This";
+  static const String noButton = "No";
+  static const String yesButton = "Yes";
+
+  // Subtasks
+  static const String viewSubtasksButton = "View Subtasks";
+
   // Points View
   static const String analyzePointsTrend = "Analyze your points trend below!";
   static const String nearDeadlineTasks = "Near Deadline Tasks";
