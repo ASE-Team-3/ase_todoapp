@@ -108,10 +108,13 @@ class TaskProvider extends ChangeNotifier {
   }
 
   Future<Task> _prepareResearchTask(Task task) async {
-    // Generate Keywords
-    final generatedKeywords =
-        KeywordGenerator.generate(task.title, task.description);
-    task = task.copyWith(keywords: generatedKeywords);
+    // Check if the task already has keywords
+    if (task.keywords.isEmpty) {
+      // Generate Keywords only if none exist
+      final generatedKeywords =
+          KeywordGenerator.generate(task.title, task.description);
+      task = task.copyWith(keywords: generatedKeywords);
+    }
 
     // Fetch Related Research Papers
     try {
