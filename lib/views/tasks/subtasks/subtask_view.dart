@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:app/views/tasks/subtasks/subtask_detail_view.dart';
+import 'package:app/models/subtask.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SubtaskView extends StatelessWidget {
   final String taskId;
@@ -54,61 +56,8 @@ class SubtaskView extends StatelessWidget {
                   itemCount: task.subTasks.length,
                   itemBuilder: (context, index) {
                     final subTask = task.subTasks[index];
-                    return Card(
-                      color: Colors.white,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ListTile(
-                        title: Text(
-                          subTask.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          subTask.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: subTask.isCompleted,
-                              onChanged: (value) {
-                                taskProvider.toggleSubTaskCompletion(
-                                    taskId, subTask.id);
-                              },
-                              activeColor: AppColors.primaryColor,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                _confirmDeleteSubTask(
-                                    context, taskProvider, taskId, subTask.id);
-                              },
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SubTaskDetailView(
-                                taskId: taskId,
-                                subTaskId: subTask.id,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                    return _buildSubTaskCard(
+                        context, taskProvider, taskId, subTask);
                   },
                 ),
               ),
@@ -143,6 +92,103 @@ class SubtaskView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSubTaskCard(
+    BuildContext context,
+    TaskProvider taskProvider,
+    String taskId,
+    SubTask subTask,
+  ) {
+    return Card(
+      color: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ListTile(
+        title: Text(
+          subTask.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subTask.type == SubTaskType.paper) ...[
+              if (subTask.author != null)
+                Text('Author: ${subTask.author!}',
+                    style: const TextStyle(color: Colors.black54)),
+              if (subTask.publishDate != null)
+                Text('Publish Date: ${subTask.publishDate!}',
+                    style: const TextStyle(color: Colors.black54)),
+              if (subTask.url != null)
+                GestureDetector(
+                  onTap: () async {
+                    final uri = Uri.parse(subTask.url!);
+
+                    try {
+                      await launchUrl(uri); // Try launching the URL directly
+                    } catch (e) {
+                      // If an error occurs, show a fallback message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not open URL')),
+                      );
+                    }
+                  },
+                  child: Text(
+                    subTask.url!,
+                    style: const TextStyle(
+                      color: AppColors.primaryColor,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ] else
+              Text(
+                subTask.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.black54),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(
+              value: subTask.isCompleted,
+              onChanged: (value) {
+                taskProvider.toggleSubTaskCompletion(taskId, subTask.id);
+              },
+              activeColor: AppColors.primaryColor,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _confirmDeleteSubTask(
+                    context, taskProvider, taskId, subTask.id);
+              },
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SubTaskDetailView(
+                taskId: taskId,
+                subTaskId: subTask.id,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -124,6 +124,8 @@ class TaskProvider extends ChangeNotifier {
         task = task.copyWith(
           suggestedPaper: relatedPapers[0]['title'],
           suggestedPaperUrl: relatedPapers[0]['url'],
+          suggestedPaperAuthor: relatedPapers[0]['author'],
+          suggestedPaperPublishDate: relatedPapers[0]['publishDate'],
         );
       }
     } catch (e) {
@@ -131,6 +133,27 @@ class TaskProvider extends ChangeNotifier {
     }
 
     return task;
+  }
+
+  Future<void> refreshSuggestedPaper(String taskId) async {
+    final task = getTaskById(taskId);
+    if (task == null) return;
+
+    try {
+      final newPaper =
+          await _researchService.fetchDailyResearchPaper(task.keywords);
+      updateTask(
+        task,
+        title: task.title,
+        description: task.description,
+        suggestedPaper: newPaper['title'],
+        suggestedPaperAuthor: newPaper['author'],
+        suggestedPaperPublishDate: newPaper['publishDate'],
+        suggestedPaperUrl: newPaper['url'],
+      );
+    } catch (e) {
+      throw Exception("Failed to refresh suggested paper: $e");
+    }
   }
 
   void updateTask(
@@ -148,6 +171,10 @@ class TaskProvider extends ChangeNotifier {
     List<String>? keywords, // Add keywords
     String? alertFrequency,
     Map<String, dynamic>? customReminder,
+    String? suggestedPaper, // Add suggested paper title
+    String? suggestedPaperAuthor, // Add suggested paper author
+    String? suggestedPaperPublishDate, // Add suggested paper publish date
+    String? suggestedPaperUrl, // Add suggested paper URL
   }) async {
     // Calculate new deadline
     final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ??
@@ -167,6 +194,8 @@ class TaskProvider extends ChangeNotifier {
         category: category,
         keywords: [], // Clear keywords for non-research tasks
         suggestedPaper: null,
+        suggestedPaperAuthor: null,
+        suggestedPaperPublishDate: null,
         suggestedPaperUrl: null,
       );
     }
@@ -186,6 +215,11 @@ class TaskProvider extends ChangeNotifier {
       keywords: keywords ?? task.keywords,
       alertFrequency: alertFrequency ?? task.alertFrequency,
       customReminder: customReminder ?? task.customReminder,
+      suggestedPaper: suggestedPaper ?? task.suggestedPaper,
+      suggestedPaperAuthor: suggestedPaperAuthor ?? task.suggestedPaperAuthor,
+      suggestedPaperPublishDate:
+          suggestedPaperPublishDate ?? task.suggestedPaperPublishDate,
+      suggestedPaperUrl: suggestedPaperUrl ?? task.suggestedPaperUrl,
       updatedAt: DateTime.now().toUtc(),
     );
 
@@ -614,15 +648,38 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // Add a sub-task to a task
+  /// Add a sub-task to a task.
+  ///
+  /// If the sub-task is a research paper (`SubTaskType.paper`), it checks for duplication
+  /// based on the URL before adding it to prevent duplicate entries.
+  /// Logs and skips addition if a duplicate paper is found.
+  ///
+  /// Parameters:
+  /// - [taskId]: The ID of the task to which the sub-task will be added.
+  /// - [subTask]: The sub-task object to be added.
   void addSubTask(String taskId, SubTask subTask) {
-    Task task = _tasks.firstWhere(
-      (t) => t.id == taskId,
-      orElse: () => throw Exception('Task with ID $taskId not found'),
-    );
+    final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
+    if (taskIndex != -1) {
+      final task = _tasks[taskIndex];
 
-    task.subTasks.add(subTask);
-    notifyListeners();
+      // Check if the subTask is a paper and already exists
+      if (subTask.type == SubTaskType.paper) {
+        final isDuplicate = task.subTasks.any((existingSubTask) =>
+            existingSubTask.type == SubTaskType.paper &&
+            existingSubTask.url == subTask.url);
+
+        if (isDuplicate) {
+          log("Subtask with URL ${subTask.url} already exists. Skipping addition.");
+          return;
+        }
+      }
+
+      final updatedSubTasks = List<SubTask>.from(task.subTasks)..add(subTask);
+      _tasks[taskIndex] = task.copyWith(subTasks: updatedSubTasks);
+      notifyListeners();
+    } else {
+      log("Task with ID $taskId not found. Could not add subtask.");
+    }
   }
 
   // Remove a sub-task from a task

@@ -64,6 +64,7 @@ dependencies:
   flutter_timezone: ^3.0.1
   flutter_dotenv: ^5.2.1
   http: ^1.2.2
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:

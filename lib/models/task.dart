@@ -29,6 +29,8 @@ class Task {
   List<String> keywords; // Keywords for research tasks
   final String? suggestedPaper;
   final String? suggestedPaperUrl;
+  final String? suggestedPaperAuthor; // Author(s) of the suggested paper
+  final String? suggestedPaperPublishDate; // Publication date of the paper
 
   Task({
     required this.title,
@@ -54,6 +56,8 @@ class Task {
     List<String>? keywords, // Initialize keywords
     this.suggestedPaper,
     this.suggestedPaperUrl,
+    this.suggestedPaperAuthor,
+    this.suggestedPaperPublishDate,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate?.toUtc() ?? DateTime.now().toUtc(),
         updatedAt = updatedAt?.toUtc() ?? DateTime.now().toUtc(),
@@ -85,6 +89,8 @@ class Task {
     List<String>? keywords, // Include keywords in copyWith
     String? suggestedPaper,
     String? suggestedPaperUrl,
+    String? suggestedPaperAuthor,
+    String? suggestedPaperPublishDate,
   }) {
     return Task(
       id: id ?? this.id,
@@ -115,6 +121,9 @@ class Task {
       keywords: keywords ?? this.keywords, // Update keywords
       suggestedPaper: suggestedPaper ?? this.suggestedPaper,
       suggestedPaperUrl: suggestedPaperUrl ?? this.suggestedPaperUrl,
+      suggestedPaperAuthor: suggestedPaperAuthor ?? this.suggestedPaperAuthor,
+      suggestedPaperPublishDate:
+          suggestedPaperPublishDate ?? this.suggestedPaperPublishDate,
     );
   }
 }

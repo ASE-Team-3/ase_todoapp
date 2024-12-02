@@ -1,4 +1,5 @@
 // views/tasks/task_detail_view.dart
+import 'package:app/models/subtask.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/utils/app_str.dart';
 import 'package:flutter/material.dart';
@@ -238,7 +239,7 @@ class TaskDetailView extends StatelessWidget {
               if (task.suggestedPaper != null &&
                   task.suggestedPaperUrl != null &&
                   task.suggestedPaper != "No title available" &&
-                  task.suggestedPaperUrl != "No DOI available")
+                  task.suggestedPaperUrl != "No DOI available") ...[
                 InkWell(
                   onTap: () async {
                     final url = Uri.parse(task.suggestedPaperUrl!);
@@ -251,8 +252,72 @@ class TaskDetailView extends StatelessWidget {
                           decoration: TextDecoration.underline,
                         ),
                   ),
-                )
-              else
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add_task),
+                  label: const Text("Add Suggested Paper as Subtask"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    final subTask = SubTask(
+                      title: task.suggestedPaper!,
+                      description: "Suggested research paper",
+                      type: SubTaskType.paper,
+                      author: task.suggestedPaperAuthor,
+                      publishDate: task.suggestedPaperPublishDate,
+                      url: task.suggestedPaperUrl,
+                    );
+
+                    final taskProvider =
+                        Provider.of<TaskProvider>(context, listen: false);
+                    taskProvider.addSubTask(task.id, subTask);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text("Suggested paper added as a subtask!")),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("Refresh Suggested Paper"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[300],
+                    foregroundColor: AppColors.primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final taskProvider =
+                        Provider.of<TaskProvider>(context, listen: false);
+                    try {
+                      await taskProvider.refreshSuggestedPaper(task.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text("Suggested paper refreshed!")),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content:
+                                Text("Error refreshing suggested paper: $e")),
+                      );
+                    }
+                  },
+                ),
+              ] else
                 Text(
                   task.suggestedPaper ?? AppStr.noSuggestedPaperMessage,
                   style: Theme.of(context).textTheme.bodyMedium,
