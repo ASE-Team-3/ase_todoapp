@@ -85,29 +85,7 @@ class TaskDetailView extends StatelessWidget {
             _buildTaskDetailsCard(context, task, formattedDeadline,
                 formattedCreationDate, taskProvider),
             const SizedBox(height: 20),
-            FutureBuilder<Map<String, String>>(
-              future: fetchAIFeedback(context, task),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Text(
-                    "Error: ${snapshot.error}",
-                    style: const TextStyle(color: Colors.red),
-                  );
-                } else if (snapshot.hasData) {
-                  final feedback = snapshot.data!;
-                  return AIFeedbackWidget(
-                    feedbackMessage: feedback['message'] ??
-                        "No motivational message available",
-                    recommendation: feedback['recommendation'] ??
-                        "No recommendation available",
-                  );
-                } else {
-                  return const Text("No AI feedback available.");
-                }
-              },
-            ),
+            _buildAiFeedbackSection(context, task),
             const SizedBox(height: 20),
             _buildAttachmentsSection(context, task, taskProvider),
             const SizedBox(height: 20),
@@ -375,6 +353,55 @@ class TaskDetailView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAiFeedbackSection(BuildContext context, Task task) {
+    return FutureBuilder<Map<String, String>>(
+      future: fetchAIFeedback(context, task),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Column(
+            children: [
+              Text(
+                "Error: ${snapshot.error}",
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () {
+                  (context as Element).markNeedsBuild();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text("Try Again"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          );
+        } else if (snapshot.hasData) {
+          final feedback = snapshot.data!;
+          return AIFeedbackWidget(
+            feedbackMessage:
+                feedback['message'] ?? "No motivational message available",
+            recommendation:
+                feedback['recommendation'] ?? "No recommendation available",
+            onRefresh: () async {
+              // Re-fetch AI feedback
+              await fetchAIFeedback(context, task);
+            },
+          );
+        }
+
+        // Fallback widget in case no state is matched
+        return const Center(
+          child: Text("No AI feedback available."),
+        );
+      },
     );
   }
 
