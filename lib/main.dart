@@ -1,5 +1,6 @@
 import 'package:app/initialize_timezones.dart';
 import 'package:app/providers/task_provider.dart';
+import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app/views/home/home_view.dart';
@@ -31,6 +32,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        Provider<OpenAIService>(create: (_) => OpenAIService()),
         Provider<ResearchService>.value(value: researchService),
         ChangeNotifierProvider(
           create: (_) => TaskProvider(

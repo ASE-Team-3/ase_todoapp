@@ -1,7 +1,9 @@
 // views/tasks/task_detail_view.dart
 import 'package:app/models/subtask.dart';
+import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/utils/app_str.dart';
+import 'package:app/views/tasks/widget/ai_feedback_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -82,6 +84,30 @@ class TaskDetailView extends StatelessWidget {
           children: [
             _buildTaskDetailsCard(context, task, formattedDeadline,
                 formattedCreationDate, taskProvider),
+            const SizedBox(height: 20),
+            FutureBuilder<Map<String, String>>(
+              future: fetchAIFeedback(context, task),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Text(
+                    "Error: ${snapshot.error}",
+                    style: const TextStyle(color: Colors.red),
+                  );
+                } else if (snapshot.hasData) {
+                  final feedback = snapshot.data!;
+                  return AIFeedbackWidget(
+                    feedbackMessage: feedback['message'] ??
+                        "No motivational message available",
+                    recommendation: feedback['recommendation'] ??
+                        "No recommendation available",
+                  );
+                } else {
+                  return const Text("No AI feedback available.");
+                }
+              },
+            ),
             const SizedBox(height: 20),
             _buildAttachmentsSection(context, task, taskProvider),
             const SizedBox(height: 20),
@@ -498,6 +524,22 @@ class TaskDetailView extends StatelessWidget {
           );
         },
       );
+    }
+  }
+
+  Future<Map<String, String>> fetchAIFeedback(
+      BuildContext context, Task task) async {
+    final openAIService = Provider.of<OpenAIService>(context, listen: false);
+
+    try {
+      return await openAIService.analyzeTask(task);
+    } catch (e, stackTrace) {
+      debugPrint("Error fetching AI feedback: $e");
+      debugPrint("Stack trace: $stackTrace");
+      return {
+        "message": "Unable to fetch AI feedback",
+        "recommendation": "",
+      };
     }
   }
 
