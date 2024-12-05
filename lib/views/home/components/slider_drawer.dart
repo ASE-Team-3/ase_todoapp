@@ -1,28 +1,36 @@
-import 'package:app/utils/app_colors.dart';
-import 'package:app/utils/app_str.dart';
+import 'package:app/views/home/settings_page.dart'; // Ensure this is the path to your settings_page.dart file
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:app/utils/app_colors.dart';
+import 'package:app/utils/app_str.dart';
 
 class CustomDrawer extends StatelessWidget {
   final List<String> views;
   final String selectedView;
   final Function(String) onViewSelected;
+  final VoidCallback? onLogout;
+  final String userName; // Added userName parameter
 
   /// Static Icons and Texts
   static const List<IconData> icons = [
     CupertinoIcons.settings,
     CupertinoIcons.info_circle_fill,
+    Icons.logout, // Added logout icon
   ];
 
   static const List<String> texts = [
     AppStr.settings,
     AppStr.details,
+    "Logout", // Added logout text
   ];
 
   const CustomDrawer({
     required this.views,
     required this.selectedView,
     required this.onViewSelected,
+    required this.userName,
+    this.onLogout,
     super.key,
   });
 
@@ -50,12 +58,8 @@ class CustomDrawer extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "NAME",
+            userName,
             style: textTheme.displayMedium,
-          ),
-          Text(
-            "Flutter Dev",
-            style: textTheme.displaySmall,
           ),
           const SizedBox(height: 30),
           // Dynamic List Section
@@ -87,7 +91,7 @@ class CustomDrawer extends StatelessWidget {
             style: TextStyle(
               color: selectedView == view ? Colors.black : Colors.white,
               fontWeight:
-                  selectedView == view ? FontWeight.bold : FontWeight.normal,
+              selectedView == view ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           leading: Icon(
@@ -141,65 +145,61 @@ class CustomDrawer extends StatelessWidget {
       case AppStr.list:
         return Icons.list;
       default:
-        return Icons.home; // Default icon for Home
+        return Icons.home;
     }
   }
 
   /// Handle navigation for static views
   void _handleStaticViewSelected(BuildContext context, String view) {
-    if (view == "Settings") {
+    if (view == AppStr.settings) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const _SettingsView(), // TODO: Implement this view
+          builder: (_) => SettingsPage(), // Direct to the actual SettingsPage
         ),
       );
-    } else if (view == "Details") {
+    } else if (view == AppStr.details) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const _DetailsView(), // TODO: Implement this view
+          builder: (_) => DetailsView(viewTitle: view), // Dynamic DetailsView
         ),
+      );
+    } else if (view == "Logout") {
+      if (onLogout != null) {
+        onLogout!();
+      } else {
+        _logout(context);
+      }
+    }
+  }
+
+  /// Default Logout function
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushReplacementNamed(context, '/login');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout Failed: ${e.toString()}')),
       );
     }
   }
 }
 
-/// Placeholder for Settings View
-class _SettingsView extends StatelessWidget {
-  const _SettingsView({super.key});
+/// Dynamic DetailsView implementation
+class DetailsView extends StatelessWidget {
+  final String viewTitle;
+
+  const DetailsView({required this.viewTitle, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Settings"),
-        backgroundColor: AppColors.primaryColor,
+        title: Text(viewTitle),
+        backgroundColor: Colors.blue,
       ),
-      body: const Center(
-        child: Text(
-          "Settings View - TODO: Implement",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder for Details View
-class _DetailsView extends StatelessWidget {
-  const _DetailsView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Details"),
-        backgroundColor: AppColors.primaryColor,
-      ),
-      body: const Center(
-        child: Text(
-          "Details View - TODO: Implement",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
+      body: Center(
+        child: Text('Details for: $viewTitle'),
       ),
     );
   }

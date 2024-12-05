@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "157563003511",
+    "project_id": "yeongu-ase-team3",
+    "storage_bucket": "yeongu-ase-team3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157563003511:android:5b23996b30d41357881c72",
+        "android_client_info": {
+          "package_name": "com.example.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMs53t5-x_WiwF1jMtddCqvJM6o14zbGk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
