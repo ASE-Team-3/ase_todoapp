@@ -1,5 +1,7 @@
 import 'package:app/providers/task_provider.dart';
 import 'package:app/services/openai_service.dart';
+import 'package:app/utils/app_colors.dart';
+import 'package:app/utils/app_str.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,7 +14,7 @@ class AITaskCreateView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Task with AI'),
+        title: const Text(AppStr.createTaskWithAI),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -20,43 +22,80 @@ class AITaskCreateView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Describe your task and subtasks:',
-              style: Theme.of(context).textTheme.bodyMedium,
+              AppStr.describeTask,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.primaryColor),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: aiPromptController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText:
-                    'E.g., Plan my research project with subtasks for literature review, analysis, and reporting.',
-                border: OutlineInputBorder(),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.primaryColor),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: aiPromptController,
+                maxLines: null, // Allows for unlimited lines like a chat box
+                style: const TextStyle(color: Colors.black),
+                decoration: const InputDecoration(
+                  hintText:
+                      'E.g., Plan my research project with subtasks for literature review, analysis, and reporting.',
+                  border: InputBorder.none,
+                ),
               ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () async {
                 final userInput = aiPromptController.text.trim();
                 if (userInput.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Please enter a task description.')),
+                    const SnackBar(content: Text(AppStr.enterTaskDescription)),
                   );
                   return;
                 }
 
                 try {
+                  // Show loading modal
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => const AlertDialog(
+                      backgroundColor: Colors.white,
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            color: AppColors.primaryColor,
+                          ),
+                          SizedBox(height: 20),
+                          Text(AppStr.generatingTaskWait,
+                              style: TextStyle(color: Colors.black)),
+                        ],
+                      ),
+                    ),
+                  );
+
                   // Call OpenAI Service
                   final openAIService =
                       Provider.of<OpenAIService>(context, listen: false);
                   final aiGeneratedTask =
                       await openAIService.createTaskFromPrompt(userInput);
 
+                  Navigator.pop(context); // Close loading modal
+
                   // Show confirmation dialog with task details
                   showDialog(
                     context: context,
                     builder: (_) => AlertDialog(
-                      title: const Text('AI-Generated Task'),
+                      title: const Text(AppStr.taskGenerated),
                       content: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +155,7 @@ class AITaskCreateView extends StatelessWidget {
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
+                          child: const Text(AppStr.cancel),
                         ),
                         TextButton(
                           onPressed: () {
@@ -131,22 +170,22 @@ class AITaskCreateView extends StatelessWidget {
                                 context); // Go back to previous screen
 
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Task created successfully!')),
+                              const SnackBar(content: Text(AppStr.taskCreated)),
                             );
                           },
-                          child: const Text('Confirm'),
+                          child: const Text(AppStr.confirm),
                         ),
                       ],
                     ),
                   );
                 } catch (e) {
+                  Navigator.pop(context); // Close loading modal
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error creating task: $e')),
+                    SnackBar(content: Text('${AppStr.errorCreatingTask}: $e')),
                   );
                 }
               },
-              child: const Text('Generate Task'),
+              child: const Text(AppStr.generateTask),
             ),
           ],
         ),

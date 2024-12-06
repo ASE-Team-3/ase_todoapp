@@ -106,4 +106,15 @@ class AppStr {
   static const String pointsHistory = "Points History";
   static const String settings = "Settings";
   static const String details = "Details";
+
+  // AI Task Create View
+  static const String createTaskWithAI = "Create Task with AI";
+  static const String describeTask = "Describe your task and subtasks:";
+  static const String generateTask = "Generate Task";
+  static const String generatingTaskWait = "Generating task, please wait...";
+  static const String taskGenerated = "AI-Generated Task";
+  static const String confirm = "Confirm";
+  static const String taskCreated = "Task created successfully!";
+  static const String errorCreatingTask = "Error creating task";
+  static const String enterTaskDescription = "Please enter a task description.";
 }
