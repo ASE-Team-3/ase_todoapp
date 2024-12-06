@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slider_drawer/flutter_slider_drawer.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for logout functionality
 
 class HomeAppBar extends StatefulWidget {
   const HomeAppBar({super.key, required this.drawerKey});
@@ -15,6 +16,7 @@ class _HomeAppBarState extends State<HomeAppBar>
     with SingleTickerProviderStateMixin {
   late AnimationController animationController;
   bool isDrawerOpen = false;
+
   @override
   void initState() {
     animationController =
@@ -40,6 +42,17 @@ class _HomeAppBarState extends State<HomeAppBar>
         widget.drawerKey.currentState!.closeSlider();
       }
     });
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut(); // Log out the user
+      Navigator.pushReplacementNamed(context, '/login'); // Navigate to login page
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout Failed: ${e.toString()}')),
+      );
+    }
   }
 
   @override
@@ -75,7 +88,19 @@ class _HomeAppBarState extends State<HomeAppBar>
                     CupertinoIcons.trash_fill,
                     size: 40,
                   )),
-            )
+            ),
+            // Logout Icon
+            Padding(
+              padding: const EdgeInsets.only(right: 20),
+              child: IconButton(
+                onPressed: () => _logout(context), // Call logout function
+                icon: const Icon(
+                  Icons.logout,
+                  size: 40,
+                  color: Colors.red, // Optional color for visibility
+                ),
+              ),
+            ),
           ],
         ),
       ),
