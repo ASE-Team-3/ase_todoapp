@@ -273,7 +273,7 @@ User Input: $prompt
 
       log("INFO: Parsed lines from AI response: $lines");
 
-      // Extract Task fields
+      // Helper to safely extract field values
       String getFieldValue(String prefix) {
         final line = lines.firstWhere(
           (line) => line.startsWith(prefix),
@@ -282,8 +282,13 @@ User Input: $prompt
         return line.replaceFirst(prefix, "").trim();
       }
 
-      final title = getFieldValue("- Title:");
-      final description = getFieldValue("- Description:");
+      // Extract task fields with fallback defaults
+      final title = getFieldValue("- Title:").isNotEmpty
+          ? getFieldValue("- Title:")
+          : "Untitled Task"; // Default if title is missing
+      final description = getFieldValue("- Description:").isNotEmpty
+          ? getFieldValue("- Description:")
+          : "No description provided."; // Default if description is missing
       final deadline = getFieldValue("- Deadline:");
       final priority = getFieldValue("- Priority:");
       final keywords = getFieldValue("- Keywords:")
@@ -291,7 +296,24 @@ User Input: $prompt
           .map((keyword) => keyword.trim())
           .where((keyword) => keyword.isNotEmpty)
           .toList();
-      final category = getFieldValue("- Category:");
+      final category = getFieldValue("- Category:").isNotEmpty
+          ? getFieldValue("- Category:")
+          : "General"; // Default category if missing
+
+      // Handle deadline: Parse specific or flexible deadlines
+      DateTime? parsedDeadline;
+      String? flexibleDeadline;
+      if (deadline.isNotEmpty) {
+        parsedDeadline = DateTime.tryParse(deadline);
+        if (parsedDeadline == null) {
+          flexibleDeadline = deadline; // Assume it's a flexible deadline string
+          parsedDeadline = calculateDeadlineFromFlexible(flexibleDeadline) ??
+              DateTime.now().add(const Duration(days: 7)); // Default fallback
+        }
+      } else {
+        log("WARNING: Deadline not provided, assigning default deadline");
+        parsedDeadline = DateTime.now().add(const Duration(days: 7)); // Default
+      }
 
       // Parse subtasks
       final subTasks = <SubTask>[];
@@ -329,19 +351,6 @@ User Input: $prompt
               (type) => type.toString().split('.').last == typeString,
               orElse: () => SubTaskType.common,
             ));
-          } else if (line.startsWith("- Author:") && currentSubTask != null) {
-            final author = line.replaceFirst("- Author:", "").trim();
-            currentSubTask = currentSubTask.copyWith(
-                author: author.isNotEmpty ? author : null);
-          } else if (line.startsWith("- Publish Date:") &&
-              currentSubTask != null) {
-            final publishDate = line.replaceFirst("- Publish Date:", "").trim();
-            currentSubTask = currentSubTask.copyWith(
-                publishDate: publishDate.isNotEmpty ? publishDate : null);
-          } else if (line.startsWith("- URL:") && currentSubTask != null) {
-            final url = line.replaceFirst("- URL:", "").trim();
-            currentSubTask =
-                currentSubTask.copyWith(url: url.isNotEmpty ? url : null);
           } else if (line.startsWith("- Completed:") &&
               currentSubTask != null) {
             final completed =
@@ -357,25 +366,22 @@ User Input: $prompt
         subTasks.add(currentSubTask);
       }
 
-      // Parse flexible or standard deadline
-      final parsedDeadline = DateTime.tryParse(deadline);
-      final flexibleDeadline = parsedDeadline == null
-          ? calculateDeadlineFromFlexible(deadline)
-          : null;
+      // Handle priority fallback
+      final parsedPriority = priority.toLowerCase() == "high"
+          ? 1
+          : priority.toLowerCase() == "low"
+              ? 3
+              : 2; // Default to medium if not specified
 
+      // Create Task object
       final task = Task(
-        title: title.isNotEmpty ? title : "Unnamed Task",
-        description:
-            description.isNotEmpty ? description : "No description provided.",
-        deadline: parsedDeadline ?? flexibleDeadline,
-        flexibleDeadline: parsedDeadline == null ? deadline : null,
-        priority: priority.toLowerCase() == "high"
-            ? 1
-            : priority.toLowerCase() == "low"
-                ? 3
-                : 2,
+        title: title,
+        description: description,
+        deadline: parsedDeadline,
+        flexibleDeadline: flexibleDeadline,
+        priority: parsedPriority,
         keywords: keywords,
-        category: category.isNotEmpty ? category : "General",
+        category: category,
         subTasks: subTasks,
       );
 
