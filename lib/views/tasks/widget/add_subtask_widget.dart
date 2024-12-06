@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/subtask.dart';
-import 'package:app/providers/task_provider.dart';
+import 'package:app/services/task_firestore_service.dart';  // Import Firestore service
 import 'package:app/utils/app_colors.dart';
 
 class AddSubTaskWidget extends StatefulWidget {
@@ -18,27 +18,36 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  void _addSubTask() {
+  // Add subtask function to use Firestore service for adding the subtask
+  void _addSubTask() async {
     if (_formKey.currentState!.validate()) {
       final newSubTask = SubTask(
         title: _titleController.text,
         description: _descriptionController.text,
       );
 
-      Provider.of<TaskProvider>(context, listen: false)
-          .addSubTask(widget.taskId, newSubTask);
+      try {
+        // Use Firestore service to add the subtask
+        await Provider.of<TaskFirestoreService>(context, listen: false)
+            .addSubTask(widget.taskId, newSubTask);
 
-      // Clear the form
-      _titleController.clear();
-      _descriptionController.clear();
+        // Clear the form fields after adding
+        _titleController.clear();
+        _descriptionController.clear();
 
-      // Show a success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subtask added successfully')),
-      );
+        // Show a success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subtask added successfully')),
+        );
 
-      // Close the modal
-      Navigator.pop(context);
+        // Close the modal
+        Navigator.pop(context);
+      } catch (e) {
+        // Handle error if adding subtask fails
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding subtask: $e')),
+        );
+      }
     }
   }
 
@@ -63,9 +72,9 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
                 Text(
                   'Add Subtask',
                   style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                        color: AppColors.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
@@ -114,7 +123,7 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(
-                    onPressed: _addSubTask,
+                    onPressed: _addSubTask,  // Calling the method to add subtask
                     icon: const Icon(Icons.add),
                     label: const Text('Add Subtask'),
                     style: ElevatedButton.styleFrom(

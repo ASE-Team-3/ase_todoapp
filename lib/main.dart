@@ -2,6 +2,7 @@ import 'package:app/initialize_timezones.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
+import 'package:app/services/task_firestore_service.dart';  // Import TaskFirestoreService
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:app/views/home/login_page.dart';
@@ -49,6 +50,9 @@ void main() async {
             flutterLocalNotificationsPlugin,
             researchService: researchService,
           ),
+        ),
+        Provider<TaskFirestoreService>(
+          create: (_) => TaskFirestoreService(),  // Provide TaskFirestoreService here
         ),
       ],
       child: const MyApp(),

@@ -1,7 +1,7 @@
-// views/tasks/task_detail_view.dart
 import 'package:app/models/subtask.dart';
 import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
+import 'package:app/services/task_firestore_service.dart'; // Add Firestore service import
 import 'package:app/utils/app_str.dart';
 import 'package:app/views/tasks/widget/ai_feedback_widget.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/attachment.dart';
-import 'package:app/providers/task_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:app/views/tasks/task_create_view.dart';
 import 'package:intl/intl.dart';
@@ -25,94 +24,92 @@ class TaskDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    TaskProvider taskProvider = Provider.of<TaskProvider>(context);
+    TaskFirestoreService taskFirestoreService = Provider.of<TaskFirestoreService>(context);
 
-    final task = taskProvider.tasks().firstWhere(
-      (t) => t.id == taskId,
-      orElse: () {
-        return Task(
-          id: taskId,
-          title: AppStr.taskNotFoundTitle,
-          description: AppStr.taskNotFoundDescription,
-          deadline: DateTime.now(),
-          attachments: [],
+    return FutureBuilder<Task>(
+      future: taskFirestoreService.getTaskById(taskId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data == null) {
+          return Center(child: Text('Task not found'));  // Update for 'taskNotFound'
+        }
+
+        final task = snapshot.data!;
+
+        final formattedDeadline = DateFormat.yMMMd().add_jm().format(task.deadline!.toLocal());
+        final formattedCreationDate = DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            iconTheme: const IconThemeData(color: Colors.black),
+            title: Text(
+              task.title,
+              style: const TextStyle(color: Colors.black),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.black),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TaskCreateView(
+                        task: task,
+                        researchService: Provider.of<ResearchService>(context, listen: false),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () {
+                  showDeleteOptionsDialog(context, task);
+                },
+              ),
+            ],
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ListView(
+              children: [
+                _buildTaskDetailsCard(
+                    context, task, formattedDeadline, formattedCreationDate, taskFirestoreService),
+                const SizedBox(height: 20),
+                _buildAiFeedbackSection(context, task),
+                const SizedBox(height: 20),
+                _buildAttachmentsSection(context, task, taskFirestoreService),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.list),
+                  label: const Text('View Subtasks'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SubtaskView(taskId: task.id),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
-    );
-
-    final formattedDeadline =
-        DateFormat.yMMMd().add_jm().format(task.deadline!.toLocal());
-    final formattedCreationDate =
-        DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: Text(
-          task.title,
-          style: const TextStyle(color: Colors.black),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.black),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TaskCreateView(
-                    task: task,
-                    researchService:
-                        Provider.of<ResearchService>(context, listen: false),
-                  ),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () {
-              showDeleteOptionsDialog(context, task);
-            },
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            _buildTaskDetailsCard(context, task, formattedDeadline,
-                formattedCreationDate, taskProvider),
-            const SizedBox(height: 20),
-            _buildAiFeedbackSection(context, task),
-            const SizedBox(height: 20),
-            _buildAttachmentsSection(context, task, taskProvider),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.list),
-              label: const Text(AppStr.viewSubtasksButton),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SubtaskView(taskId: task.id),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -121,7 +118,7 @@ class TaskDetailView extends StatelessWidget {
       Task task,
       String formattedDeadline,
       String formattedCreationDate,
-      TaskProvider taskProvider) {
+      TaskFirestoreService taskFirestoreService) {
     return Card(
       color: Colors.white,
       elevation: 4,
@@ -134,11 +131,11 @@ class TaskDetailView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              AppStr.taskDescriptionLabel,
+              'Task Description',
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               task.description,
@@ -147,11 +144,11 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              AppStr.deadlineLabel,
+              'Deadline',
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               formattedDeadline,
@@ -160,11 +157,11 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              AppStr.creationDateLabel,
+              'Creation Date',
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               formattedCreationDate,
@@ -173,11 +170,11 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              AppStr.rewardPointsLabel,
+              'Reward Points',
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               '${task.points} pts',
@@ -186,27 +183,26 @@ class TaskDetailView extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(),
             Text(
-              AppStr.categoryLabel,
+              'Category',
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               task.category,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-
-            // Keywords (Only for Research category)
+            // Keywords section for Research category
             if (task.category == "Research") ...[
               const SizedBox(height: 10),
               const Divider(),
               Text(
-                AppStr.keywordsLabel,
+                'Keywords',
                 style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (task.keywords.isNotEmpty)
                 Wrap(
@@ -214,31 +210,30 @@ class TaskDetailView extends StatelessWidget {
                   runSpacing: 4.0,
                   children: task.keywords
                       .map((keyword) => Chip(
-                            label: Text(keyword),
-                            backgroundColor:
-                                AppColors.primaryColor.withOpacity(0.1),
-                            labelStyle:
-                                const TextStyle(color: AppColors.primaryColor),
-                          ))
+                    label: Text(keyword),
+                    backgroundColor:
+                    AppColors.primaryColor.withOpacity(0.1),
+                    labelStyle:
+                    const TextStyle(color: AppColors.primaryColor),
+                  ))
                       .toList(),
                 )
               else
                 Text(
-                  AppStr.noKeywordsMessage,
+                  'No Keywords available',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
             ],
-
-            // Suggested Paper (Only for Research category)
+            // Suggested Paper section for Research category
             if (task.category == "Research") ...[
               const SizedBox(height: 10),
               const Divider(),
               Text(
-                AppStr.suggestedPaperLabel,
+                'Suggested Paper',
                 style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (task.suggestedPaper != null &&
                   task.suggestedPaperUrl != null &&
@@ -252,9 +247,9 @@ class TaskDetailView extends StatelessWidget {
                   child: Text(
                     task.suggestedPaper!,
                     style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          color: AppColors.primaryColor,
-                          decoration: TextDecoration.underline,
-                        ),
+                      color: AppColors.primaryColor,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -274,19 +269,18 @@ class TaskDetailView extends StatelessWidget {
                     final subTask = SubTask(
                       title: task.suggestedPaper!,
                       description: "Suggested research paper",
-                      type: SubTaskType.paper,
+                      status: SubtaskStatus.pending,  // Assuming the status should be pending
                       author: task.suggestedPaperAuthor,
-                      publishDate: task.suggestedPaperPublishDate,
+                      publishDate: task.suggestedPaperPublishDate != null
+                          ? DateTime.parse(task.suggestedPaperPublishDate!)
+                          : null,
                       url: task.suggestedPaperUrl,
                     );
 
-                    final taskProvider =
-                        Provider.of<TaskProvider>(context, listen: false);
-                    taskProvider.addSubTask(task.id, subTask);
+                    taskFirestoreService.addSubTask(task.id, subTask);  // Use Firestore to add subtask
 
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("Suggested paper added as a subtask!")),
+                      const SnackBar(content: Text("Suggested paper added as a subtask!")),
                     );
                   },
                 ),
@@ -304,26 +298,21 @@ class TaskDetailView extends StatelessWidget {
                     ),
                   ),
                   onPressed: () async {
-                    final taskProvider =
-                        Provider.of<TaskProvider>(context, listen: false);
                     try {
-                      await taskProvider.refreshSuggestedPaper(task.id);
+                      await taskFirestoreService.refreshSuggestedPaper(task.id);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Suggested paper refreshed!")),
+                        const SnackBar(content: Text("Suggested paper refreshed!")),
                       );
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                Text("Error refreshing suggested paper: $e")),
+                        SnackBar(content: Text("Error refreshing suggested paper: $e")),
                       );
                     }
                   },
                 ),
               ] else
                 Text(
-                  task.suggestedPaper ?? AppStr.noSuggestedPaperMessage,
+                  task.suggestedPaper ?? 'No Suggested Paper available',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
             ],
@@ -335,16 +324,16 @@ class TaskDetailView extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  AppStr.completedLabel,
+                  'Completed',
                   style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                        color: AppColors.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Checkbox(
                   value: task.isCompleted,
                   onChanged: (value) {
-                    taskProvider.toggleTaskCompletion(task);
+                    taskFirestoreService.toggleTaskCompletion(task);  // Use Firestore to toggle completion
                   },
                   activeColor: AppColors.primaryColor,
                 ),
@@ -356,6 +345,7 @@ class TaskDetailView extends StatelessWidget {
     );
   }
 
+  // Helper Method for displaying AI feedback
   Widget _buildAiFeedbackSection(BuildContext context, Task task) {
     return FutureBuilder<Map<String, String>>(
       future: fetchAIFeedback(context, task),
@@ -387,17 +377,15 @@ class TaskDetailView extends StatelessWidget {
           final feedback = snapshot.data!;
           return AIFeedbackWidget(
             feedbackMessage:
-                feedback['message'] ?? "No motivational message available",
+            feedback['message'] ?? "No motivational message available",
             recommendation:
-                feedback['recommendation'] ?? "No recommendation available",
+            feedback['recommendation'] ?? "No recommendation available",
             onRefresh: () async {
-              // Re-fetch AI feedback
-              await fetchAIFeedback(context, task);
+              await fetchAIFeedback(context, task);  // Re-fetch AI feedback
             },
           );
         }
 
-        // Fallback widget in case no state is matched
         return const Center(
           child: Text("No AI feedback available."),
         );
@@ -405,8 +393,9 @@ class TaskDetailView extends StatelessWidget {
     );
   }
 
+  // Helper Method for displaying attachments section
   Widget _buildAttachmentsSection(
-      BuildContext context, Task task, TaskProvider taskProvider) {
+      BuildContext context, Task task, TaskFirestoreService taskFirestoreService) {
     return Card(
       color: Colors.white,
       elevation: 4,
@@ -421,9 +410,9 @@ class TaskDetailView extends StatelessWidget {
             Text(
               AppStr.attachmentsLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppColors.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 10),
             ElevatedButton.icon(
@@ -436,7 +425,7 @@ class TaskDetailView extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              onPressed: () => _addAttachment(context, taskProvider),
+              onPressed: () => _addAttachment(context, taskFirestoreService),
             ),
             const SizedBox(height: 10),
             if (task.attachments.isNotEmpty)
@@ -458,7 +447,7 @@ class TaskDetailView extends StatelessWidget {
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
-                        taskProvider.removeAttachment(task.id, attachment.id);
+                        taskFirestoreService.removeAttachment(task.id, attachment.id);  // Use Firestore
                       },
                     ),
                     onTap: () => _openAttachment(attachment),
@@ -471,8 +460,9 @@ class TaskDetailView extends StatelessWidget {
     );
   }
 
+  // Handle adding attachment to Firestore
   Future<void> _addAttachment(
-      BuildContext context, TaskProvider taskProvider) async {
+      BuildContext context, TaskFirestoreService taskFirestoreService) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -483,42 +473,40 @@ class TaskDetailView extends StatelessWidget {
         type: AttachmentType.file,
       );
 
-      taskProvider.addAttachment(taskId, newAttachment);
+      taskFirestoreService.addAttachment(taskId, newAttachment);  // Add to Firestore
     }
   }
 
+  // Show delete options dialog for repeating tasks
   Future<void> showDeleteOptionsDialog(BuildContext context, Task task) async {
-    final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+    final taskFirestoreService = Provider.of<TaskFirestoreService>(context, listen: false);
 
     if (task.isRepeating) {
-      // Show the three-option dialog for repeating tasks
+      // Show delete options dialog for repeating tasks
       await showDialog(
         context: context,
         builder: (context) {
           return AlertDialog(
             title: const Text(AppStr.deleteRepeatingTaskTitle),
-            content: const Text(
-              AppStr.deleteRepeatingTaskContent,
-            ),
+            content: const Text(AppStr.deleteRepeatingTaskContent),
             actions: [
               TextButton(
                 onPressed: () {
-                  taskProvider.deleteRepeatingTasks(task, option: "all");
+                  taskFirestoreService.deleteRepeatingTasks(task, option: "all");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteAllButton),
               ),
               TextButton(
                 onPressed: () {
-                  taskProvider.deleteRepeatingTasks(task,
-                      option: "this_and_following");
+                  taskFirestoreService.deleteRepeatingTasks(task, option: "this_and_following");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteThisAndFollowingButton),
               ),
               TextButton(
                 onPressed: () {
-                  taskProvider.deleteRepeatingTasks(task, option: "only_this");
+                  taskFirestoreService.deleteRepeatingTasks(task, option: "only_this");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteOnlyThisButton),
@@ -528,7 +516,7 @@ class TaskDetailView extends StatelessWidget {
         },
       );
     } else {
-      // Show a Yes/No confirmation dialog for non-repeating tasks
+      // Show delete confirmation dialog for non-repeating tasks
       await showDialog<bool>(
         context: context,
         builder: (context) {
@@ -542,9 +530,9 @@ class TaskDetailView extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  taskProvider.removeTask(task);
+                  taskFirestoreService.removeTask(task.id);  // Correct, passing task ID as a String
                   Navigator.popUntil(context, (route) => route.isFirst);
-                }, // Yes
+                },
                 child: const Text(AppStr.yesButton),
               ),
             ],
@@ -554,8 +542,8 @@ class TaskDetailView extends StatelessWidget {
     }
   }
 
-  Future<Map<String, String>> fetchAIFeedback(
-      BuildContext context, Task task) async {
+  // Helper function to fetch AI feedback
+  Future<Map<String, String>> fetchAIFeedback(BuildContext context, Task task) async {
     final openAIService = Provider.of<OpenAIService>(context, listen: false);
 
     try {
@@ -570,6 +558,7 @@ class TaskDetailView extends StatelessWidget {
     }
   }
 
+  // Helper function to get the appropriate icon for attachments
   IconData _getAttachmentIcon(AttachmentType type) {
     switch (type) {
       case AttachmentType.file:
@@ -585,6 +574,7 @@ class TaskDetailView extends StatelessWidget {
     }
   }
 
+  // Open the attachment based on type
   void _openAttachment(Attachment attachment) async {
     if (attachment.type == AttachmentType.link) {
       final url = attachment.path;

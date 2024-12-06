@@ -16,25 +16,27 @@ import 'package:app/models/attachment.dart';
 import 'package:app/providers/points_manager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firebase Firestore import
+import 'package:app/services/task_firestore_service.dart'; // Firebase service for tasks
 
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   final ResearchService _researchService;
   final NotificationService _notificationService;
-  final PointsManager _pointsManager =
-      PointsManager(); // PointsManager instance
+  final PointsManager _pointsManager = PointsManager(); // PointsManager instance
   final NotificationThrottler _notificationThrottler = NotificationThrottler();
+  final TaskFirestoreService _taskService = TaskFirestoreService(); // Firestore service
 
-  TaskProvider(FlutterLocalNotificationsPlugin plugin,
-      {required ResearchService researchService})
+  TaskProvider(FlutterLocalNotificationsPlugin plugin, {required ResearchService researchService})
       : _notificationService = NotificationService(plugin),
         _researchService = researchService {
     _notificationService.initialize();
+    loadTasks(); // Load tasks from Firestore on initialization
+    log('TaskProvider initialized and tasks loaded.');
   }
+
   List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
-
   int get totalPoints => _pointsManager.totalPoints;
-
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
   /// This function retrieves the list of tasks with their `DateTime` fields
@@ -49,40 +51,45 @@ class TaskProvider extends ChangeNotifier {
   /// - All operations on tasks (e.g., filtering by deadline) should use
   ///   the output of this function to ensure correct time interpretation.
   ///
+  ///
   /// Returns:
   /// - A `List<Task>` where all `DateTime` fields are converted to local time.
   List<Task> Function() get tasks => () {
-        return _tasks.map((task) {
-          // Convert deadline to local time before returning
-          return task.copyWith(
-            creationDate: convertUtcToLocal(task.creationDate),
-            deadline: convertUtcToLocal(task.deadline),
-            nextOccurrence: convertUtcToLocal(task.nextOccurrence),
-          );
-        }).toList();
-      };
+    return _tasks.map((task) {
+      return task.copyWith(
+        creationDate: convertUtcToLocal(task.creationDate),
+        deadline: convertUtcToLocal(task.deadline),
+        nextOccurrence: convertUtcToLocal(task.nextOccurrence),
+      );
+    }).toList();
+  };
 
+  /// Loads tasks from Firestore and updates the local task list.
+  void loadTasks() {
+    log('Loading tasks from Firestore...');
+    _taskService.getTasks().listen((tasksFromFirestore) {
+      _tasks.clear();
+      _tasks.addAll(tasksFromFirestore);  // Add the fetched tasks to the list
+      notifyListeners();  // Notify listeners to update the UI
+      log('Tasks loaded from Firestore and updated.');
+    });
+  }
+
+  /// Adds a task to Firestore and schedules notifications if necessary.
   void addTask(Task task) async {
-    // Handle research-specific tasks
+    log('Adding task: ${task.title}');
     if (task.category == "Research") {
       task = await _prepareResearchTask(task);
+      log('Research task prepared: ${task.title}');
     }
 
-    // Ensure deadlines are in UTC
-    task = task.copyWith(
-      deadline: task.deadline?.toUtc(),
-      alertFrequency: task.alertFrequency, // Handle alert frequency
-      customReminder: task.customReminder, // Handle custom reminder
-    );
+    task = task.copyWith(deadline: task.deadline?.toUtc());
 
-    // Handle flexible deadlines
     if (task.flexibleDeadline != null && task.deadline == null) {
-      final localDeadline =
-          calculateDeadlineFromFlexible(task.flexibleDeadline!);
+      final localDeadline = calculateDeadlineFromFlexible(task.flexibleDeadline!);
       task = task.copyWith(deadline: localDeadline?.toUtc());
     }
 
-    // Schedule notification if the task is incomplete and has a deadline
     if (!task.isCompleted && task.deadline != null) {
       _notificationService.scheduleNotification(
         title: 'Task Reminder',
@@ -91,8 +98,8 @@ class TaskProvider extends ChangeNotifier {
         alertFrequency: task.alertFrequency,
         customReminder: task.customReminder,
       );
+      log('Notification scheduled for task: ${task.title}');
     }
-
     // Handle repeating tasks
     if (task.isRepeating) {
       final repeatingGroupId = const Uuid().v4();
@@ -100,26 +107,24 @@ class TaskProvider extends ChangeNotifier {
       _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
       // Add single instance task to the list
-      _tasks.add(task);
+      await _taskService.addTask(task);
+      log('Task added to Firestore: ${task.title}');
     }
 
     // Notify listeners about the new task
     notifyListeners();
   }
 
+  /// Prepares a research task by generating keywords and fetching related papers.
   Future<Task> _prepareResearchTask(Task task) async {
-    // Check if the task already has keywords
     if (task.keywords.isEmpty) {
-      // Generate Keywords only if none exist
-      final generatedKeywords =
-          KeywordGenerator.generate(task.title, task.description);
+      final generatedKeywords = KeywordGenerator.generate(task.title, task.description);
       task = task.copyWith(keywords: generatedKeywords);
+      log('Keywords generated for research task: ${task.title}');
     }
 
-    // Fetch Related Research Papers
     try {
-      final relatedPapers =
-          await _researchService.fetchRelatedResearch(task.keywords);
+      final relatedPapers = await _researchService.fetchRelatedResearch(task.keywords);
       if (relatedPapers.isNotEmpty) {
         task = task.copyWith(
           suggestedPaper: relatedPapers[0]['title'],
@@ -127,80 +132,123 @@ class TaskProvider extends ChangeNotifier {
           suggestedPaperAuthor: relatedPapers[0]['author'],
           suggestedPaperPublishDate: relatedPapers[0]['publishDate'],
         );
+        log('Research papers found and added to task: ${task.title}');
       }
     } catch (e) {
       log("Error fetching research papers: $e");
+      throw Exception("Failed to refresh suggested paper: $e");
     }
 
     return task;
   }
 
-  Future<void> refreshSuggestedPaper(String taskId) async {
-    final task = getTaskById(taskId);
-    if (task == null) return;
-
-    try {
-      final newPaper =
-          await _researchService.fetchDailyResearchPaper(task.keywords);
-      updateTask(
-        task,
-        title: task.title,
-        description: task.description,
-        suggestedPaper: newPaper['title'],
-        suggestedPaperAuthor: newPaper['author'],
-        suggestedPaperPublishDate: newPaper['publishDate'],
-        suggestedPaperUrl: newPaper['url'],
+  /// Generates repeating tasks based on the task's repetition group ID.
+  void _generateRepeatingTasks(Task task, String groupId) {
+    log('Generating repeating tasks for: ${task.title}');
+    DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
+    while (nextOccurrence != null && nextOccurrence.isBefore(DateTime.now().add(Duration(days: 730)))) {
+      final newTask = task.copyWith(
+        id: const Uuid().v4(),
+        isCompleted: false,
+        deadline: nextOccurrence,
+        repeatingGroupId: groupId,
+        nextOccurrence: null,
       );
-    } catch (e) {
-      throw Exception("Failed to refresh suggested paper: $e");
+
+      _tasks.add(newTask);
+      log('New repeating task generated: ${newTask.title}');
+      nextOccurrence = _calculateNextOccurrence(task.repeatInterval, task.customRepeatDays, nextOccurrence);
+    }
+    log('Completed repeating tasks generation for: ${task.title}');
+  }
+
+  /// Calculates the next occurrence based on the repeat interval and custom days.
+  DateTime _calculateNextOccurrence(String? interval, int? customDays, DateTime lastOccurrence) {
+    switch (interval) {
+      case "daily":
+        return lastOccurrence.add(Duration(days: 1));
+      case "weekly":
+        return lastOccurrence.add(Duration(days: 7));
+      case "monthly":
+        return DateTime(lastOccurrence.year, lastOccurrence.month + 1, lastOccurrence.day);
+      case "yearly":
+        return DateTime(lastOccurrence.year + 1, lastOccurrence.month, lastOccurrence.day);
+      case "custom":
+        return lastOccurrence.add(Duration(days: customDays ?? 0));
+      default:
+        throw Exception("Invalid repeat interval");
     }
   }
 
-  void updateTask(
-    Task task, {
+  /// Prepares and updates repeating tasks when there's a change in the task.
+  Future<Task> _prepareRepeatingTaskForUpdate({
+    required Task task,
     required String title,
     required String description,
-    DateTime? selectedDeadline,
-    String? flexibleDeadline,
-    bool? isRepeating,
-    String? repeatInterval,
-    int? customRepeatDays,
-    List<Attachment>? attachments,
-    int? points,
-    String? category, // Add category
-    List<String>? keywords, // Add keywords
-    String? alertFrequency,
-    Map<String, dynamic>? customReminder,
-    String? suggestedPaper, // Add suggested paper title
-    String? suggestedPaperAuthor, // Add suggested paper author
-    String? suggestedPaperPublishDate, // Add suggested paper publish date
-    String? suggestedPaperUrl, // Add suggested paper URL
+    required String category,
+    List<String>? keywords,
   }) async {
-    // Calculate new deadline
-    final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ??
-        calculateFlexibleDeadline(flexibleDeadline);
+    log('Preparing repeating task for update: ${task.title}');
+    final newKeywords = keywords ?? KeywordGenerator.generate(title, description);
 
-    // Handle category change or research-related updates
+    task = task.copyWith(
+      category: category,
+      keywords: newKeywords,
+    );
+
+    try {
+      final relatedPapers = await _researchService.fetchRelatedResearch(newKeywords);
+      if (relatedPapers.isNotEmpty) {
+        task = task.copyWith(
+          suggestedPaper: relatedPapers[0]['title'],
+          suggestedPaperUrl: relatedPapers[0]['url'],
+        );
+        log('Updated research papers for task: ${task.title}');
+      } else {
+        task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
+      }
+    } catch (e) {
+      log("Error fetching research papers: $e");
+      task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
+    }
+
+    return task;
+  }
+
+  /// Updates a task and regenerates repeating tasks if necessary.
+  Future<void> updateTask(
+      Task task, {
+        required String title,
+        required String description,
+        DateTime? selectedDeadline,
+        String? flexibleDeadline,
+        bool? isRepeating,
+        String? repeatInterval,
+        int? customRepeatDays,
+        List<Attachment>? attachments,
+        int? points,
+        String? category,
+        List<String>? keywords,
+        String? alertFrequency,
+        Map<String, dynamic>? customReminder,
+        String? suggestedPaper,
+        String? suggestedPaperAuthor,
+        String? suggestedPaperPublishDate,
+        String? suggestedPaperUrl,
+      }) async {
+    log('Updating task: ${task.title}');
+    final DateTime? calculatedDeadline = selectedDeadline?.toUtc() ?? calculateFlexibleDeadline(flexibleDeadline);
+
     if (category != null && category == "Research") {
-      task = await _prepareResearchTaskForUpdate(
+      task = await _prepareRepeatingTaskForUpdate(
         task: task,
         title: title,
         description: description,
         category: category,
         keywords: keywords,
       );
-    } else if (category != null && category != task.category) {
-      task = task.copyWith(
-        category: category,
-        keywords: [], // Clear keywords for non-research tasks
-        suggestedPaper: null,
-        suggestedPaperAuthor: null,
-        suggestedPaperPublishDate: null,
-        suggestedPaperUrl: null,
-      );
     }
 
-    // Update the task
     final updatedTask = task.copyWith(
       title: title,
       description: description,
@@ -217,530 +265,25 @@ class TaskProvider extends ChangeNotifier {
       customReminder: customReminder ?? task.customReminder,
       suggestedPaper: suggestedPaper ?? task.suggestedPaper,
       suggestedPaperAuthor: suggestedPaperAuthor ?? task.suggestedPaperAuthor,
-      suggestedPaperPublishDate:
-          suggestedPaperPublishDate ?? task.suggestedPaperPublishDate,
+      suggestedPaperPublishDate: suggestedPaperPublishDate ?? task.suggestedPaperPublishDate,
       suggestedPaperUrl: suggestedPaperUrl ?? task.suggestedPaperUrl,
       updatedAt: DateTime.now().toUtc(),
     );
 
-    // Schedule notification
-    scheduleTaskNotification(
-      notificationService: _notificationService,
-      task: updatedTask,
-      title: 'Updated Reminder',
-    );
+    await _taskService.updateTask(updatedTask);
+    log('Task updated in Firestore: ${task.title}');
 
-    // Find the task index and update it
+    if (updatedTask.isRepeating) {
+      _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId!);
+    }
+
     final index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
-
-      // Regenerate repeating tasks if needed
-      if (updatedTask.isRepeating) {
-        _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
-      }
-
       notifyListeners();
+      log('Task updated in local list: ${task.title}');
     } else {
       log('Task with ID ${task.id} not found for update.');
     }
-  }
-
-  Future<Task> _prepareResearchTaskForUpdate({
-    required Task task,
-    required String title,
-    required String description,
-    required String category,
-    List<String>? keywords,
-  }) async {
-    // Regenerate keywords if not explicitly provided
-    final newKeywords =
-        keywords ?? KeywordGenerator.generate(title, description);
-
-    task = task.copyWith(
-      category: category,
-      keywords: newKeywords,
-    );
-
-    // Fetch related research papers if necessary
-    try {
-      final relatedPapers =
-          await _researchService.fetchRelatedResearch(newKeywords);
-      if (relatedPapers.isNotEmpty) {
-        task = task.copyWith(
-          suggestedPaper: relatedPapers[0]['title'],
-          suggestedPaperUrl: relatedPapers[0]['url'],
-        );
-      } else {
-        task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
-      }
-    } catch (e) {
-      log("Error fetching research papers: $e");
-      task = task.copyWith(suggestedPaper: null, suggestedPaperUrl: null);
-    }
-
-    return task;
-  }
-
-  // Updated _generateRepeatingTasks to accept a limit parameter
-  void _generateRepeatingTasks(Task task, String? groupId, {DateTime? limit}) {
-    if (!task.isRepeating || task.repeatInterval == null) return;
-
-    final DateTime now = DateTime.now().toUtc();
-    final DateTime defaultLimit =
-        now.add(const Duration(days: 730)); // Default: 2 years
-    final DateTime generationLimit = limit ?? defaultLimit;
-
-    DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
-    while (nextOccurrence != null && nextOccurrence.isBefore(generationLimit)) {
-      // Create a new task for each occurrence with its unique deadline
-      final newTask = task.copyWith(
-        id: const Uuid().v4(),
-        isCompleted: false, // Reset completion status
-        deadline: nextOccurrence,
-        repeatingGroupId: groupId, // Ensure groupId is consistent
-        nextOccurrence: null, // Only the original task has `nextOccurrence`
-      );
-
-      _tasks.add(newTask);
-
-      // Calculate the next occurrence
-      nextOccurrence = _calculateNextOccurrence(
-        interval: task.repeatInterval,
-        customDays: task.customRepeatDays,
-        lastOccurrence: nextOccurrence,
-      ).toUtc();
-    }
-
-    log('Extended repeating tasks for: ${task.title}');
-  }
-
-  void updateRepeatingTasks(
-    Task task, {
-    required String option, // "all", "this_and_following", "only_this"
-    required String title,
-    required String description,
-    DateTime? selectedDeadline, // New specific deadline
-    String? flexibleDeadline, // New flexible deadline
-    String? repeatInterval, // New repeat interval (e.g., "daily", "monthly")
-    int? customRepeatDays,
-    int? points, // Custom interval days
-  }) {
-    final groupId = task.repeatingGroupId;
-    if (groupId == null) return;
-
-    // Convert selectedDeadline to UTC
-    final DateTime? utcSelectedDeadline = selectedDeadline?.toUtc();
-
-    if (option == "all") {
-      // Update all tasks with the same repeating groupId
-      final firstTask = _tasks.firstWhere((t) => t.id == task.id);
-      DateTime baseDeadline = utcSelectedDeadline ??
-          calculateDeadlineFromFlexible(flexibleDeadline!)?.toUtc() ??
-          firstTask.deadline!;
-
-      for (int i = 0; i < _tasks.length; i++) {
-        if (_tasks[i].repeatingGroupId == groupId) {
-          final taskIndex = i;
-          _tasks[taskIndex] = _tasks[taskIndex].copyWith(
-            title: title,
-            description: description,
-            points: points,
-            deadline: _calculateDynamicDeadline(
-              startDate: baseDeadline,
-              interval: repeatInterval ?? task.repeatInterval,
-              customDays: customRepeatDays ?? task.customRepeatDays,
-              iteration:
-                  taskIndex, // Adjust iteration for dynamic recalculation
-            ).toUtc(), // Ensure UTC
-            repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
-            customRepeatDays: customRepeatDays,
-            flexibleDeadline: flexibleDeadline,
-          );
-        }
-      }
-    } else if (option == "this_and_following") {
-      // Update this and all subsequent tasks
-      bool update = false;
-      DateTime baseDeadline = utcSelectedDeadline ??
-          calculateDeadlineFromFlexible(flexibleDeadline!)?.toUtc() ??
-          task.deadline!;
-
-      for (int i = 0; i < _tasks.length; i++) {
-        if (_tasks[i].id == task.id) {
-          update = true;
-        }
-
-        if (update && _tasks[i].repeatingGroupId == groupId) {
-          final taskIndex = i;
-          final iterationOffset =
-              taskIndex - _tasks.indexWhere((t) => t.id == task.id);
-          _tasks[taskIndex] = _tasks[taskIndex].copyWith(
-            title: title,
-            description: description,
-            points: points,
-            deadline: _calculateDynamicDeadline(
-              startDate: baseDeadline,
-              interval: repeatInterval ?? task.repeatInterval,
-              customDays: customRepeatDays ?? task.customRepeatDays,
-              iteration: iterationOffset,
-            ).toUtc(), // Ensure UTC
-            repeatInterval: repeatInterval ?? _tasks[taskIndex].repeatInterval,
-            customRepeatDays: customRepeatDays,
-            flexibleDeadline: flexibleDeadline,
-          );
-        }
-      }
-    } else if (option == "only_this") {
-      // Update only this specific task
-      int index = _tasks.indexWhere((t) => t.id == task.id);
-      if (index != -1) {
-        _tasks[index] = _tasks[index].copyWith(
-          title: title,
-          description: description,
-          points: points,
-          deadline: utcSelectedDeadline ?? _tasks[index].deadline,
-          flexibleDeadline: flexibleDeadline ?? _tasks[index].flexibleDeadline,
-          repeatInterval: repeatInterval ?? _tasks[index].repeatInterval,
-          customRepeatDays: customRepeatDays ?? _tasks[index].customRepeatDays,
-        );
-      }
-    }
-
-    notifyListeners();
-  }
-
-  DateTime _calculateDynamicDeadline({
-    required DateTime startDate,
-    required String? interval,
-    required int? customDays,
-    required int iteration,
-  }) {
-    DateTime nextOccurrence = startDate;
-
-    for (int i = 0; i < iteration; i++) {
-      nextOccurrence = _calculateNextOccurrence(
-        interval: interval,
-        customDays: customDays,
-        lastOccurrence: nextOccurrence,
-      );
-    }
-
-    return nextOccurrence.toUtc(); // Ensure UTC
-  }
-
-  // Extend repeating tasks beyond the current 2-year limit
-  void extendRepeatingTasks(Task task, int additionalYears) {
-    // Calculate the new end date based on the additional years
-    final DateTime currentLimit = task.deadline ?? DateTime.now();
-    final DateTime newLimit =
-        currentLimit.add(Duration(days: additionalYears * 365));
-
-    // Regenerate tasks up to the new limit
-    _generateRepeatingTasks(
-      task.copyWith(deadline: task.deadline), // Use the original deadline
-      task.repeatingGroupId, // Ensure repeatingGroupId is preserved
-      limit: newLimit, // Pass the new limit for task generation
-    );
-
-    notifyListeners();
-  }
-
-  // Handle overdue tasks by skipping or resetting deadlines
-  void handleOverdueTask(Task task, bool skipToNext) {
-    if (task.isRepeating && skipToNext) {
-      final DateTime nextDeadline = _calculateNextOccurrence(
-        interval: task.repeatInterval,
-        customDays: task.customRepeatDays,
-        lastOccurrence: task.deadline ?? DateTime.now(),
-      );
-
-      updateTask(
-        task,
-        title: task.title,
-        description: task.description,
-        selectedDeadline: nextDeadline,
-        isRepeating: task.isRepeating,
-        repeatInterval: task.repeatInterval,
-      );
-
-      log('Skipped overdue task: ${task.title}. New deadline: $nextDeadline');
-    }
-  }
-
-  // Edit a specific occurrence's deadline
-  void editTaskDeadline(String taskId, DateTime newDeadline) {
-    final int index = _tasks.indexWhere((task) => task.id == taskId);
-    if (index != -1) {
-      final Task task = _tasks[index].copyWith(deadline: newDeadline);
-      _tasks[index] = task;
-      notifyListeners();
-      log('Updated deadline for task: ${task.title} to $newDeadline');
-    } else {
-      log('Task with ID $taskId not found for deadline update.');
-    }
-  }
-
-  // Helper to calculate the next occurrence
-  DateTime _calculateNextOccurrence({
-    required String? interval,
-    required int? customDays,
-    required DateTime lastOccurrence,
-  }) {
-    switch (interval) {
-      case "daily":
-        return lastOccurrence.add(const Duration(days: 1));
-      case "weekly":
-        return lastOccurrence.add(const Duration(days: 7));
-      case "monthly":
-        return DateTime(
-          lastOccurrence.year,
-          lastOccurrence.month + 1,
-          lastOccurrence.day,
-          lastOccurrence.hour,
-          lastOccurrence.minute,
-        );
-      case "yearly":
-        return DateTime(
-          lastOccurrence.year + 1,
-          lastOccurrence.month,
-          lastOccurrence.day,
-          lastOccurrence.hour,
-          lastOccurrence.minute,
-        );
-      case "custom":
-        if (customDays != null) {
-          return lastOccurrence.add(Duration(days: customDays));
-        }
-        break;
-    }
-    throw Exception("Invalid repeat interval or custom days");
-  }
-
-  void toggleTaskCompletion(Task task) {
-    final isNowCompleted = !task.isCompleted;
-
-    // Ensure points are valid
-    final points = task.points;
-
-    // Update task immutably
-    final updatedTask = task.copyWith(isCompleted: isNowCompleted);
-
-    // Find the index of the task in the list and replace it immutably
-    final index = _tasks.indexWhere((t) => t.id == task.id);
-    if (index != -1) {
-      _tasks[index] = updatedTask;
-    }
-
-    // Award or deduct points based on completion status
-    if (isNowCompleted) {
-      _pointsManager.awardPoints(
-        points,
-        'Task "${task.title}" completed',
-      );
-      _notificationThrottler.sendThrottledNotification(
-        sendNotification: _notificationService.sendNotification,
-        title: 'Hurrah!',
-        body: 'You completed the task: "${task.title}"!',
-      );
-    } else {
-      _pointsManager.deductPoints(
-        points,
-        'Task "${task.title}" marked as incomplete',
-      );
-      log('Task marked as incomplete: "${task.title}"');
-    }
-
-    notifyListeners(); // Notify listeners about the state change
-  }
-
-  Task? getTaskById(String taskId) {
-    try {
-      return _tasks.firstWhere((task) => task.id == taskId);
-    } catch (e) {
-      log('Task with ID $taskId not found');
-      return null;
-    }
-  }
-
-  // Remove a task
-  void removeTask(Task task) {
-    if (_tasks.any((t) => t.id == task.id)) {
-      _tasks.removeWhere((t) => t.id == task.id);
-      notifyListeners();
-    } else {
-      log('Task not found for deletion');
-    }
-  }
-
-  void deleteRepeatingTasks(Task task, {required String option}) {
-    switch (option) {
-      case "all":
-        if (task.repeatingGroupId != null) {
-          deleteTasksByGroupId(task.repeatingGroupId!);
-        } else {
-          log('Task does not have a repeatingGroupId: ${task.title}');
-        }
-        break;
-      case "this_and_following":
-        _deleteThisAndFollowingTasks(task);
-        break;
-      case "only_this":
-        _deleteOnlyThisTask(task);
-        break;
-      default:
-        log('Unknown delete option: $option');
-    }
-    notifyListeners();
-  }
-
-  // Delete this task and all subsequent occurrences
-  void _deleteThisAndFollowingTasks(Task task) {
-    if (task.repeatingGroupId == null) {
-      log('Task does not have a repeatingGroupId: ${task.title}');
-      return;
-    }
-
-    final groupId = task.repeatingGroupId;
-    final taskDeadline = task.deadline;
-
-    if (taskDeadline == null) {
-      log('Task deadline is null: ${task.title}');
-      return;
-    }
-
-    // Find all tasks with the same groupId and deadlines after or equal to the current task's deadline
-    final tasksToDelete = _tasks.where((t) {
-      return t.repeatingGroupId == groupId &&
-              t.deadline != null &&
-              t.deadline!.isAfter(taskDeadline) ||
-          t.deadline!.isAtSameMomentAs(taskDeadline);
-    }).toList();
-
-    if (tasksToDelete.isNotEmpty) {
-      _tasks.removeWhere((t) => tasksToDelete.contains(t));
-      log('Deleted ${tasksToDelete.length} tasks in group $groupId from and after deadline $taskDeadline');
-      notifyListeners(); // Notify listeners about the update
-    } else {
-      log('No tasks found to delete for repeatingGroupId: $groupId starting from $taskDeadline');
-    }
-  }
-
-  // Delete only this specific task occurrence
-  void _deleteOnlyThisTask(Task task) {
-    _tasks.removeWhere((t) => t.id == task.id);
-    log('Deleted only this occurrence of task: ${task.title}');
-  }
-
-  // Delete all tasks linked to a specific repeatingGroupId
-  void deleteTasksByGroupId(String repeatingGroupId) {
-    // Filter and remove all tasks with the specified groupId
-    final tasksToDelete = _tasks
-        .where((task) => task.repeatingGroupId == repeatingGroupId)
-        .toList();
-
-    if (tasksToDelete.isNotEmpty) {
-      _tasks.removeWhere((task) => task.repeatingGroupId == repeatingGroupId);
-      log('Deleted ${tasksToDelete.length} tasks with repeatingGroupId: $repeatingGroupId');
-      notifyListeners(); // Notify listeners about the change
-    } else {
-      log('No tasks found with repeatingGroupId: $repeatingGroupId');
-    }
-  }
-
-  /// Add a sub-task to a task.
-  ///
-  /// If the sub-task is a research paper (`SubTaskType.paper`), it checks for duplication
-  /// based on the URL before adding it to prevent duplicate entries.
-  /// Logs and skips addition if a duplicate paper is found.
-  ///
-  /// Parameters:
-  /// - [taskId]: The ID of the task to which the sub-task will be added.
-  /// - [subTask]: The sub-task object to be added.
-  void addSubTask(String taskId, SubTask subTask) {
-    final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
-    if (taskIndex != -1) {
-      final task = _tasks[taskIndex];
-
-      // Check if the subTask is a paper and already exists
-      if (subTask.type == SubTaskType.paper) {
-        final isDuplicate = task.subTasks.any((existingSubTask) =>
-            existingSubTask.type == SubTaskType.paper &&
-            existingSubTask.url == subTask.url);
-
-        if (isDuplicate) {
-          log("Subtask with URL ${subTask.url} already exists. Skipping addition.");
-          return;
-        }
-      }
-
-      final updatedSubTasks = List<SubTask>.from(task.subTasks)..add(subTask);
-      _tasks[taskIndex] = task.copyWith(subTasks: updatedSubTasks);
-      notifyListeners();
-    } else {
-      log("Task with ID $taskId not found. Could not add subtask.");
-    }
-  }
-
-  // Remove a sub-task from a task
-  void removeSubTask(String taskId, String subTaskId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    task.subTasks.removeWhere((st) => st.id == subTaskId);
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void toggleSubTaskCompletion(String taskId, String subTaskId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-
-    // Toggle the completion status of the subtask
-    subTask.isCompleted = !subTask.isCompleted;
-
-    // Check if all subtasks are completed and update the task's completion status
-    task.isCompleted = task.subTasks.every((subTask) => subTask.isCompleted);
-
-    notifyListeners();
-  }
-
-  void addSubTaskItem(String taskId, String subTaskId, SubTaskItem item) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    subTask.items.add(item);
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void toggleSubTaskItemCompletion(
-      String taskId, String subTaskId, String itemId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    final item = subTask.items.firstWhere((i) => i.id == itemId);
-    item.isCompleted = !item.isCompleted;
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void removeSubTaskItem(String taskId, String subTaskId, String itemId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    subTask.items.removeWhere((i) => i.id == itemId);
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void addAttachment(String taskId, Attachment attachment) {
-    Task task = _tasks.firstWhere((t) => t.id == taskId);
-    task.attachments.add(attachment);
-    notifyListeners();
-  }
-
-  void removeAttachment(String taskId, String attachmentId) {
-    Task task = _tasks.firstWhere((t) => t.id == taskId);
-    task.attachments.removeWhere((a) => a.id == attachmentId);
-    notifyListeners();
   }
 }

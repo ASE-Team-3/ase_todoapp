@@ -23,12 +23,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/task.dart';
-import 'package:app/providers/task_provider.dart';
+import 'package:app/services/task_firestore_service.dart'; // Import Firestore service
 import 'package:uuid/uuid.dart';
 
 class TaskCreateView extends StatefulWidget {
   final Task? task;
-  final ResearchService researchService; // Add researchService dependency
+  final ResearchService researchService;
 
   const TaskCreateView({
     super.key,
@@ -42,29 +42,27 @@ class TaskCreateView extends StatefulWidget {
 
 class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController titleTaskController = TextEditingController();
-  final TextEditingController descriptionTaskController =
-      TextEditingController();
+  final TextEditingController descriptionTaskController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
   DateTime? selectedDeadline;
   String? flexibleDeadline;
   List<Attachment> attachments = [];
   int lastValidPoints = 0;
   bool isRepeating = false;
-  String? repeatInterval; // E.g., "daily", "weekly", etc.
-  int? customRepeatDays; // For custom intervals
-  DateTime? nextOccurrence; // Next occurrence of the repeating task
-  String? alertFrequency = "5_minutes"; // Default valid value
+  String? repeatInterval;
+  int? customRepeatDays;
+  DateTime? nextOccurrence;
+  String? alertFrequency = "5_minutes";
   int? customReminderQuantity;
   String? customReminderUnit;
   Map<String, dynamic>? customReminder = {"unit": "hours", "quantity": 1};
 
-  // Add state variables
-  String? selectedCategory = "General"; // Default category
+  String? selectedCategory = "General";
   List<String> researchKeywords = [];
   String? suggestedPaper;
   String? suggestedPaperUrl;
 
-  // Generate Keywords from Task Title and Description
+  // Generates keywords from task title and description
   void generateResearchKeywords() {
     final title = titleTaskController.text.trim();
     final description = descriptionTaskController.text.trim();
@@ -75,14 +73,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text("Please fill in the task title or description first.")),
+        const SnackBar(content: Text("Please fill in the task title or description first.")),
       );
     }
   }
 
-  // Add Keyword
+  // Adds a new keyword to researchKeywords
   void addKeyword(String keyword) {
     setState(() {
       if (!researchKeywords.contains(keyword)) {
@@ -91,21 +87,19 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     });
   }
 
-  // Remove Keyword
+  // Removes a keyword from researchKeywords
   void removeKeyword(String keyword) {
     setState(() {
       researchKeywords.remove(keyword);
     });
   }
 
+  // Generates keywords by splitting the title and description into unique words
   List<String> generateKeywords(String title, String description) {
-    // Example: Simple keyword extraction (replace with real logic or API)
     final allText = "$title $description".toLowerCase();
-    final words =
-        allText.split(RegExp(r'\s+')).toSet(); // Split into unique words
-    final keywords =
-        words.where((word) => word.length > 3).toList(); // Filter short words
-    return keywords.take(5).toList(); // Return the top 5 keywords
+    final words = allText.split(RegExp(r'\s+')).toSet();
+    final keywords = words.where((word) => word.length > 3).toList();
+    return keywords.take(5).toList();
   }
 
   @override
@@ -122,7 +116,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       suggestedPaper = widget.task!.suggestedPaper;
       suggestedPaperUrl = widget.task!.suggestedPaperUrl;
 
-      // Initialize custom reminder variables if they exist
       if (widget.task!.customReminder != null) {
         customReminderQuantity = widget.task!.customReminder!['quantity'];
         customReminderUnit = widget.task!.customReminder!['unit'];
@@ -157,6 +150,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Bottom buttons for saving/updating or deleting tasks
   Widget _buildBottomSideButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -169,9 +163,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             onPressed: _deleteTask,
           ),
         _buildButton(
-          label: widget.task == null
-              ? AppStr.addTaskString
-              : AppStr.updateTaskString,
+          label: widget.task == null ? AppStr.addTaskString : AppStr.updateTaskString,
           icon: null,
           color: AppColors.primaryColor,
           onPressed: _saveOrUpdateTask,
@@ -180,13 +172,14 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Save or update the task to Firestore
   void _saveOrUpdateTask() async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
 
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         (selectedDeadline != null || flexibleDeadline != null)) {
-      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+      final taskFirestoreService = TaskFirestoreService();  // Use Firestore service
 
       // Validate alert frequency
       if (alertFrequency == "custom" &&
@@ -199,28 +192,28 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
         return;
       }
-      final customReminderConfig =
-          (alertFrequency == "custom") ? customReminder : null;
+
+      final customReminderConfig = (alertFrequency == "custom") ? customReminder : null;
 
       // Prepare common task fields
       final String category = selectedCategory ?? "General";
-      final List<String> keywords =
-          category == "Research" ? researchKeywords : [];
+      final List<String> keywords = category == "Research" ? researchKeywords : [];
       final DateTime? deadline = selectedDeadline;
       final String? flexibleDeadlineOption = flexibleDeadline;
 
+      // Check if it's a new task or an update
       if (widget.task == null) {
         // Creating a new task
         final newTask = Task(
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          category: category, // Save selected category
-          keywords: keywords, // Save keywords
+          category: category,
+          keywords: keywords,
           deadline: deadline,
           flexibleDeadline: flexibleDeadlineOption,
-          alertFrequency: alertFrequency, // Save alert frequency
-          customReminder: customReminderConfig, // Save custom reminder
+          alertFrequency: alertFrequency,
+          customReminder: customReminderConfig,
           isRepeating: isRepeating,
           repeatInterval: repeatInterval,
           customRepeatDays: customRepeatDays,
@@ -230,7 +223,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
 
         try {
-          taskProvider.addTask(newTask);
+          // Add task to Firestore
+          await taskFirestoreService.addTask(newTask);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task added successfully!")),
           );
@@ -260,29 +254,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
 
         try {
-          if (widget.task!.isRepeating) {
-            // Handle repeating task updates
-            _showUpdateOptionsDialog(taskProvider);
-          } else {
-            // Handle normal task updates
-            taskProvider.updateTask(
-              widget.task!,
-              title: updatedTask.title,
-              description: updatedTask.description,
-              category: updatedTask.category,
-              keywords: updatedTask.keywords,
-              selectedDeadline: updatedTask.deadline,
-              flexibleDeadline: updatedTask.flexibleDeadline,
-              alertFrequency: updatedTask.alertFrequency,
-              customReminder: updatedTask.customReminder,
-              isRepeating: updatedTask.isRepeating,
-              repeatInterval: updatedTask.repeatInterval,
-              customRepeatDays: updatedTask.customRepeatDays,
-              attachments: updatedTask.attachments,
-              points: updatedTask.points,
-            );
-          }
-
+          // Update task in Firestore
+          await taskFirestoreService.updateTask(updatedTask);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task updated successfully!")),
           );
@@ -296,78 +269,46 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         }
       }
     } else {
-      // Validation error
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
     }
   }
 
-  Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
+  // Show options to update repeating tasks
+  Future<void> _showUpdateOptionsDialog(TaskFirestoreService taskFirestoreService) async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
     await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text("Update Repeating Task"),
-          content: const Text(
-            "How would you like to update this repeating task?",
-          ),
+          content: const Text("How would you like to update this repeating task?"),
           actions: [
             TextButton(
               onPressed: () {
-                // Update all repeating tasks
-                taskProvider.updateRepeatingTasks(
-                  widget.task!,
-                  option: "all",
-                  title: titleTaskController.text,
-                  description: descriptionTaskController.text,
-                  points: enteredPoints,
-                  selectedDeadline: selectedDeadline,
-                  repeatInterval: repeatInterval,
-                  customRepeatDays: customRepeatDays,
-                );
+                taskFirestoreService.updateTask(widget.task!);
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("Update All"),
             ),
             TextButton(
               onPressed: () {
-                // Update this task and all subsequent tasks
-                taskProvider.updateRepeatingTasks(
-                  widget.task!,
-                  option: "this_and_following",
-                  title: titleTaskController.text,
-                  description: descriptionTaskController.text,
-                  points: enteredPoints,
-                  selectedDeadline: selectedDeadline,
-                  repeatInterval: repeatInterval,
-                  customRepeatDays: customRepeatDays,
-                );
+                taskFirestoreService.updateTask(widget.task!);
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("This and Following"),
             ),
             TextButton(
               onPressed: () {
-                // Update only this specific task occurrence
-                taskProvider.updateRepeatingTasks(
-                  widget.task!,
-                  option: "only_this",
-                  title: titleTaskController.text,
-                  description: descriptionTaskController.text,
-                  points: enteredPoints,
-                  selectedDeadline: selectedDeadline,
-                  repeatInterval: repeatInterval,
-                  customRepeatDays: customRepeatDays,
-                );
+                taskFirestoreService.updateTask(widget.task!);
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("Only This"),
             ),
@@ -377,11 +318,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  /// Reset fields after adding/updating a task
+  // Reset all fields after adding or updating a task
   void _resetFields() {
     titleTaskController.clear();
     descriptionTaskController.clear();
-    pointsController.clear;
+    pointsController.clear();
     setState(() {
       selectedDeadline = null;
       attachments.clear();
@@ -393,7 +334,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     });
   }
 
-  /// Calculate the next occurrence based on repeat settings
+  // Calculate next occurrence based on repeat settings
   DateTime? _calculateNextOccurrence() {
     if (!isRepeating) return null;
 
@@ -416,13 +357,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return null;
   }
 
-  void _deleteTask() {
+  // Delete the task from Firestore
+  void _deleteTask() async {
     if (widget.task != null) {
       try {
-        Provider.of<TaskProvider>(context, listen: false)
-            .removeTask(widget.task!);
-        Navigator.of(context)
-            .pop(MaterialPageRoute(builder: (context) => const HomeView()));
+        final taskFirestoreService = TaskFirestoreService();
+        await taskFirestoreService.deleteTask(widget.task!.id);
+        Navigator.of(context).pop(MaterialPageRoute(builder: (context) => const HomeView()));
       } catch (e) {
         log('Error deleting task: $e');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -432,6 +373,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Build a button with specified properties
   Widget _buildButton({
     required String label,
     IconData? icon,
@@ -448,8 +390,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           borderRadius: BorderRadius.circular(15),
         ),
         child: Row(
-          mainAxisAlignment:
-              icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
+          mainAxisAlignment: icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
             if (icon != null) Icon(icon, color: AppColors.primaryColor),
             if (icon != null) const SizedBox(width: 8),
@@ -465,6 +406,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Main UI components and layout for creating or updating tasks
   Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
     return SingleChildScrollView(
       child: Column(
@@ -472,8 +414,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 20),
-            child: Text(AppStr.titleOfTitleTextField,
-                style: textTheme.headlineMedium),
+            child: Text(AppStr.titleOfTitleTextField, style: textTheme.headlineMedium),
           ),
           RepTextField(
             controller: titleTaskController,
@@ -536,13 +477,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               setState(() {
                 flexibleDeadline = value;
                 if (value != "Specific Deadline") {
-                  selectedDeadline = null; // Reset specific deadline
+                  selectedDeadline = null;
                 }
               });
             },
             onSpecificDeadlineSelected: (date) {
               setState(() {
-                selectedDeadline = date; // Update the specific deadline
+                selectedDeadline = date;
               });
             },
           ),
@@ -551,7 +492,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
-                  : AppStr.selectDate, // Use AppStr for "Select Date"
+                  : AppStr.selectDate,
               onTap: () {
                 DatePicker.showDatePicker(context, onConfirm: (date) {
                   setState(() {
@@ -570,7 +511,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
-                  : AppStr.selectDate, // Use AppStr for "Select Date"
+                  : AppStr.selectDate,
               onTap: () {
                 DatePicker.showTimePicker(context, onConfirm: (time) {
                   setState(() {
@@ -624,22 +565,18 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             ),
           ],
           const SizedBox(height: 16),
-
-          // Category Dropdown
           CategoryDropdown(
             selectedCategory: selectedCategory,
             onCategoryChanged: (value) {
               setState(() {
                 selectedCategory = value;
                 if (selectedCategory != "Research") {
-                  researchKeywords.clear(); // Reset keywords
+                  researchKeywords.clear();
                 }
               });
             },
           ),
           const SizedBox(height: 16),
-
-          // Conditionally show Research Section
           if (selectedCategory == "Research") ...[
             ResearchSection(
               keywords: researchKeywords,
@@ -676,8 +613,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content:
-                            Text("Failed to refresh research suggestions")),
+                        content: Text("Failed to refresh research suggestions")),
                   );
                 }
               },
@@ -690,10 +626,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Header text section with title for the task form
   Widget _buildTopSideTexts(TextTheme textTheme) {
-    // Determine if it's an add or update action
-    final titleText =
-        widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
+    final titleText = widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -718,12 +653,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the attachment section where users can add files or links
   Widget _buildAttachmentsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppStr.attachmentsLabel,
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(AppStr.attachmentsLabel, style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -750,6 +685,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the repeat interval dropdown for recurring tasks
   Widget _buildRepeatIntervalDropdown(TextTheme textTheme) {
     if (!isRepeating) return const SizedBox.shrink();
 
@@ -758,12 +694,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       onChanged: (value) {
         setState(() {
           repeatInterval = value;
-          if (value != "custom") customRepeatDays = null; // Reset custom days
+          if (value != "custom") customRepeatDays = null;
         });
       },
     );
   }
 
+  // Build the repeating toggle for toggling the repeating task feature
   Widget _buildRepeatingToggle(TextTheme textTheme) {
     return RepeatingToggle(
       isRepeating: isRepeating,
@@ -780,9 +717,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the custom interval input for setting custom repeat intervals
   Widget _buildCustomIntervalInput(TextTheme textTheme) {
-    if (!isRepeating || repeatInterval != "custom")
-      return const SizedBox.shrink();
+    if (!isRepeating || repeatInterval != "custom") return const SizedBox.shrink();
 
     return CustomIntervalInput(
       customRepeatDays: customRepeatDays,
@@ -794,7 +731,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Individual attachment tile with delete option
+  // Build each individual attachment tile with a delete option
   Widget _buildAttachmentTile(Attachment attachment) {
     return ListTile(
       leading: Icon(_getAttachmentIcon(attachment.type)),
@@ -806,6 +743,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Get the correct icon based on the attachment type
   IconData _getAttachmentIcon(AttachmentType type) {
     switch (type) {
       case AttachmentType.file:
@@ -819,6 +757,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Pick a file using file picker
   void _pickFile() async {
     final result = await FilePicker.platform.pickFiles();
     if (result != null) {
@@ -833,6 +772,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Prompt for adding a URL link as an attachment
   void _promptForLink() {
     showDialog(
       context: context,
@@ -870,6 +810,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Remove an attachment from the list
   void _removeAttachment(String attachmentId) {
     setState(() {
       attachments.removeWhere((a) => a.id == attachmentId);

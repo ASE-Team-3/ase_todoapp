@@ -7,7 +7,7 @@ import 'package:app/views/home/widget/calendar_view.dart';
 import 'package:app/views/home/widget/priority_view.dart';
 import 'package:app/views/home/widget/due_date_view.dart';
 import 'package:app/views/home/widget/points_history_view.dart';
-import 'package:app/views/home/widget/task_list_view.dart';
+import 'package:app/views/home/widget/task_list_view.dart'; // TaskListView import
 import 'package:flutter/material.dart';
 import 'package:flutter_slider_drawer/flutter_slider_drawer.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // For Authentication
@@ -53,7 +53,7 @@ class _HomeViewState extends State<HomeView> {
       if (user != null) {
         print("User found: ${user.uid}");
 
-        // Query Firestore
+        // Query Firestore for user data
         final docSnapshot = await FirebaseFirestore.instance
             .collection('users') // Your Firestore collection for users
             .doc(user.uid) // Document ID is the user's UID
@@ -134,6 +134,7 @@ class _HomeViewState extends State<HomeView> {
     print("Building main content for selected view: $selectedView");
     final taskProvider = Provider.of<TaskProvider>(context);
 
+    // Display the corresponding view based on the selected tab
     switch (selectedView) {
       case AppStr.calendar:
         return CalendarView(tasks: taskProvider.tasks());
@@ -144,7 +145,7 @@ class _HomeViewState extends State<HomeView> {
       case AppStr.pointsHistory:
         return const PointsHistoryView();
       case AppStr.list:
-        return TaskListView(tasks: taskProvider.tasks());
+        return const TaskListView(); // No need to pass tasks here anymore
       default:
         return const PointsView();
     }
