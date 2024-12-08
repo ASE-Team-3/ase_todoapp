@@ -1,213 +1,279 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPageState extends StatefulWidget {
+  const SettingsPageState({super.key});
+
   @override
-  _SettingsPageState createState() => _SettingsPageState();
+  State<SettingsPageState> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _newProjectController = TextEditingController();
+class _SettingsPageState extends State<SettingsPageState> {
+  // Controllers for input fields
+  final TextEditingController projectNameController = TextEditingController();
+  final TextEditingController projectDescriptionController = TextEditingController();
 
-  late String _userId;
-  String _email = '';
-  List<String> _projects = [];
-  String _emailQueryResult = 'Loading...';
+  // State variables
+  List<String> selectedMembers = []; // Selected user IDs
+  List<Map<String, String>> users = []; // List of all users fetched from Firestore
+  List<DocumentSnapshot> projects = []; // List of projects created by the current user
+  String? selectedProjectId; // The ID of the project being edited
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-    _queryByEmail();
+    _fetchUsers(); // Fetch users for member assignment dropdown
+    _fetchProjects(); // Fetch existing projects
   }
 
-  Future<void> _loadUserData() async {
+  /// Fetch users for the member dropdown
+  Future<void> _fetchUsers() async {
     try {
-      // Get the current user's ID and email
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        _userId = user.uid;
-        _email = user.email ?? '';
-
-        // Fetch user data from Firestore
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(_userId).get();
-        Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
-
-        if (data != null) {
-          setState(() {
-            _nameController.text = data['name'] ?? ''; // Populate name
-            _projects = List<String>.from(data['projects'] ?? []); // Populate projects
-          });
-        }
-      }
+      final snapshot = await FirebaseFirestore.instance.collection('users').get();
+      setState(() {
+        users = snapshot.docs.map((doc) {
+          return {
+            'id': doc['userId']?.toString() ?? '',
+            'name': doc['name']?.toString() ?? 'Unknown User',
+          };
+        }).toList();
+      });
+      log("Fetched ${users.length} users successfully.");
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load user data: ${e.toString()}')),
-      );
+      log("Error fetching users: $e");
     }
   }
 
-  Future<void> _queryByEmail() async {
-    try {
-      if (_email.isEmpty) {
-        setState(() {
-          _emailQueryResult = 'No email available for the user.';
-        });
-        return;
-      }
+  /// Fetch projects created by the current user
+  Future<void> _fetchProjects() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
 
-      // Query Firestore for users with the current email
-      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: _email)
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('projects')
+          .where('createdBy', isEqualTo: currentUser.uid)
           .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final userData = querySnapshot.docs.first.data() as Map<String, dynamic>;
-        print('Query Result for $_email: $userData');
-        setState(() {
-          _emailQueryResult = 'User Data for $_email: $userData';
+      setState(() {
+        projects = snapshot.docs;
+      });
+      log("Fetched ${projects.length} projects.");
+    } catch (e) {
+      log("Error fetching projects: $e");
+    }
+  }
+
+  /// Save or update a project
+  Future<void> _saveProject() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) return;
+
+    final projectName = projectNameController.text.trim();
+    final projectDescription = projectDescriptionController.text.trim();
+
+    if (projectName.isEmpty || projectDescription.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Project name and description are required.")),
+      );
+      return;
+    }
+
+    try {
+      if (selectedProjectId == null) {
+        // Enforce project limit of 3
+        if (projects.length >= 3) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("You can only create up to 3 projects.")),
+          );
+          return;
+        }
+
+        // Add new project
+        await FirebaseFirestore.instance.collection('projects').add({
+          'name': projectName,
+          'description': projectDescription,
+          'createdBy': currentUser.uid,
+          'members': selectedMembers,
+          'creationDate': FieldValue.serverTimestamp(),
         });
+        log("Project '$projectName' created successfully.");
       } else {
-        print('No user found with email $_email.');
-        setState(() {
-          _emailQueryResult = 'No user found with email $_email.';
+        // Update existing project
+        await FirebaseFirestore.instance.collection('projects').doc(selectedProjectId).update({
+          'name': projectName,
+          'description': projectDescription,
+          'members': selectedMembers,
+          'updatedAt': FieldValue.serverTimestamp(),
         });
+        log("Project '$projectName' updated successfully.");
       }
+
+      _fetchProjects();
+      _resetForm();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Project saved successfully.")),
+      );
     } catch (e) {
-      print('Failed to query by email: $e');
-      setState(() {
-        _emailQueryResult = 'Failed to query by email: ${e.toString()}';
-      });
+      log("Error saving project: $e");
     }
   }
 
-  Future<void> _updateName() async {
+  /// Delete a project
+  Future<void> _deleteProject(String projectId) async {
     try {
-      // Update the user's name in Firestore
-      await FirebaseFirestore.instance.collection('users').doc(_userId).update({
-        'name': _nameController.text.trim(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name updated successfully!')),
-      );
+      await FirebaseFirestore.instance.collection('projects').doc(projectId).delete();
+      log("Project '$projectId' deleted successfully.");
+      _fetchProjects();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update name: ${e.toString()}')),
-      );
+      log("Error deleting project: $e");
     }
   }
 
-  Future<void> _addProject() async {
-    try {
-      String newProject = _newProjectController.text.trim();
+  /// Load project data for editing
+  void _loadProjectForEdit(DocumentSnapshot project) {
+    setState(() {
+      selectedProjectId = project.id;
+      projectNameController.text = project['name'];
+      projectDescriptionController.text = project['description'];
+      selectedMembers = List<String>.from(project['members'] ?? []);
+    });
+    log("Loaded project '${project['name']}' for editing.");
+  }
 
-      if (newProject.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Project name cannot be empty.')),
+  /// Reset the form fields
+  void _resetForm() {
+    setState(() {
+      selectedProjectId = null;
+      projectNameController.clear();
+      projectDescriptionController.clear();
+      selectedMembers = [];
+    });
+    log("Form reset.");
+  }
+
+  /// Build the project list view
+  Widget _buildProjectList() {
+    return Column(
+      children: projects.map((project) {
+        return ListTile(
+          title: Text(project['name']),
+          subtitle: Text(project['description']),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _loadProjectForEdit(project),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _deleteProject(project.id),
+              ),
+            ],
+          ),
         );
-        return;
-      }
+      }).toList(),
+    );
+  }
 
-      // Add the new project to the Firestore `projects` array
-      await FirebaseFirestore.instance.collection('users').doc(_userId).update({
-        'projects': FieldValue.arrayUnion([newProject]),
-      });
-
-      setState(() {
-        _projects.add(newProject); // Update local state
-        _newProjectController.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Project added successfully!')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add project: ${e.toString()}')),
-      );
-    }
+  /// Build member dropdown for project assignment
+  Widget _buildMemberDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Assign Members", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        DropdownButtonFormField<String>(
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: "Add Member",
+          ),
+          items: users.map((user) {
+            return DropdownMenuItem<String>(
+              value: user['id'],
+              child: Text(user['name'] ?? "Unknown User"),
+            );
+          }).toList(),
+          onChanged: (value) {
+            if (value != null && !selectedMembers.contains(value)) {
+              setState(() {
+                selectedMembers.add(value);
+              });
+              log("Added member: $value");
+            }
+          },
+        ),
+        Wrap(
+          spacing: 8,
+          children: selectedMembers.map((memberId) {
+            final user = users.firstWhere(
+                  (user) => user['id'] == memberId,
+              orElse: () => {'name': "Unknown User"},
+            );
+            return Chip(
+              label: Text(user['name'] ?? "Unknown User"),
+              onDeleted: () {
+                setState(() {
+                  selectedMembers.remove(memberId);
+                });
+                log("Removed member: $memberId");
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: Padding(
+      appBar: AppBar(title: const Text("Manage Projects")),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Update Name',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Your Projects", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            _buildProjectList(),
+            const Divider(),
+
+            // Form for create/update project
+            const Text("Project Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: projectNameController,
+              decoration: const InputDecoration(labelText: "Project Name", border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: projectDescriptionController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: "Project Description", border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 8),
+            _buildMemberDropdown(),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveProject,
+                child: Text(selectedProjectId == null ? "Create Project" : "Update Project"),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _updateName,
-                child: const Text('Update Name'),
-              ),
-              const Divider(height: 30),
-              const Text(
-                'Existing Projects',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              _buildProjectsList(),
-              const Divider(height: 30),
-              const Text(
-                'Add New Project',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _newProjectController,
-                decoration: const InputDecoration(labelText: 'New Project Name'),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _addProject,
-                child: const Text('Add Project'),
-              ),
-              const Divider(height: 30),
-              const Text(
-                'Email Query Result',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Text(_emailQueryResult),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Builds the list of existing projects
-  Widget _buildProjectsList() {
-    if (_projects.isEmpty) {
-      return const Text('No projects found.');
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      itemCount: _projects.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(_projects[index]),
-        );
-      },
-    );
+  @override
+  void dispose() {
+    projectNameController.dispose();
+    projectDescriptionController.dispose();
+    super.dispose();
   }
 }

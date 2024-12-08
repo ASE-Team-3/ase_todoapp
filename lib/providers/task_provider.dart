@@ -60,6 +60,9 @@ class TaskProvider extends ChangeNotifier {
         creationDate: convertUtcToLocal(task.creationDate),
         deadline: convertUtcToLocal(task.deadline),
         nextOccurrence: convertUtcToLocal(task.nextOccurrence),
+        createdBy: task.createdBy, // Preserve the original `createdBy`
+        assignedBy: task.assignedBy, // Preserve the original `assignedBy`
+        assignedTo: task.assignedTo, // Preserve the original `assignedTo`
       );
     }).toList();
   };

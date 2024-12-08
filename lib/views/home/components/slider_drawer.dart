@@ -154,7 +154,7 @@ class CustomDrawer extends StatelessWidget {
     if (view == AppStr.settings) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => SettingsPage(), // Direct to the actual SettingsPage
+          builder: (_) => SettingsPageState(), // Direct to the actual SettingsPage
         ),
       );
     } else if (view == AppStr.details) {
