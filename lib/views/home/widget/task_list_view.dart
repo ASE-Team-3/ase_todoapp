@@ -12,7 +12,7 @@ class TaskListView extends StatelessWidget {
     final taskFirestoreService = Provider.of<TaskFirestoreService>(context); // Access TaskFirestoreService
 
     return StreamBuilder<List<Task>>(
-      stream: taskFirestoreService.getTasks(), // Get tasks from Firestore as a stream
+      stream: taskFirestoreService.getTasksForUser(), // Get tasks from Firestore as a stream
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator()); // Show loading indicator while fetching data

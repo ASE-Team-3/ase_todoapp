@@ -70,7 +70,7 @@ class TaskProvider extends ChangeNotifier {
   /// Loads tasks from Firestore and updates the local task list.
   void loadTasks() {
     log('Loading tasks from Firestore...');
-    _taskService.getTasks().listen((tasksFromFirestore) {
+    _taskService.getTasksForUser().listen((tasksFromFirestore) {
       _tasks.clear();
       _tasks.addAll(tasksFromFirestore);  // Add the fetched tasks to the list
       notifyListeners();  // Notify listeners to update the UI
