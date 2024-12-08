@@ -83,6 +83,13 @@ class _SettingsPageState extends State<SettingsPageState> {
     }
 
     try {
+      // Ensure creator's user ID is always in the members list
+      final updatedMembers = List<String>.from(selectedMembers);
+      if (!updatedMembers.contains(currentUser.uid)) {
+        updatedMembers.add(currentUser.uid);
+        log("Added creator's ID (${currentUser.uid}) to the members list.");
+      }
+
       if (selectedProjectId == null) {
         // Enforce project limit of 3
         if (projects.length >= 3) {
@@ -97,23 +104,23 @@ class _SettingsPageState extends State<SettingsPageState> {
           'name': projectName,
           'description': projectDescription,
           'createdBy': currentUser.uid,
-          'members': selectedMembers,
+          'members': updatedMembers, // Add creator and other members
           'creationDate': FieldValue.serverTimestamp(),
         });
-        log("Project '$projectName' created successfully.");
+        log("Project '$projectName' created successfully with members: $updatedMembers.");
       } else {
         // Update existing project
         await FirebaseFirestore.instance.collection('projects').doc(selectedProjectId).update({
           'name': projectName,
           'description': projectDescription,
-          'members': selectedMembers,
+          'members': updatedMembers, // Ensure creator's ID is included
           'updatedAt': FieldValue.serverTimestamp(),
         });
-        log("Project '$projectName' updated successfully.");
+        log("Project '$projectName' updated successfully with members: $updatedMembers.");
       }
 
-      _fetchProjects();
-      _resetForm();
+      _fetchProjects(); // Refresh project list
+      _resetForm(); // Reset form
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Project saved successfully.")),
       );

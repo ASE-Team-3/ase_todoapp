@@ -4,6 +4,7 @@ import 'package:app/services/research_service.dart';
 import 'package:app/services/task_firestore_service.dart'; // Add Firestore service import
 import 'package:app/utils/app_str.dart';
 import 'package:app/views/tasks/widget/ai_feedback_widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:open_file/open_file.dart';
@@ -19,6 +20,71 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 class TaskDetailView extends StatelessWidget {
   final String taskId;
+  /// Fetch human-readable details for createdBy, assignedTo, and projectId
+  /// Fetch user and project details using Firestore.
+  /// Logs and returns the 'name' fields for createdBy, assignedTo, and projectId.
+  Future<Map<String, String>> _fetchUserDetails(
+      String createdBy, String? assignedTo, String? projectId) async {
+    final firestore = FirebaseFirestore.instance; // Firestore instance
+    final Map<String, String> details = {
+      'createdBy': 'Unknown',          // Default for createdBy
+      'assignedTo': 'Not Assigned',    // Default for assignedTo
+      'projectName': 'Non-project related', // Default for project
+    };
+
+    try {
+      // Fetch 'createdBy' user name from 'users' collection
+      print("Fetching createdBy user with ID: $createdBy");
+      if (createdBy.isNotEmpty) {
+        final createdByDoc = await firestore.collection('users').doc(createdBy).get();
+        if (createdByDoc.exists) {
+          final createdByName = createdByDoc.data()?['name'];
+          if (createdByName != null && createdByName is String) {
+            details['createdBy'] = createdByName;
+            print("Created By: $createdByName");
+          } else {
+            print("Warning: 'name' field is missing or not a String in user document: $createdBy");
+          }
+        } else {
+          print("Warning: No user document found for createdBy ID: $createdBy");
+        }
+      } else {
+        print("Warning: createdBy ID is empty.");
+      }
+
+      // Fetch 'assignedTo' user name (optional)
+      if (assignedTo != null && assignedTo.isNotEmpty) {
+        print("Fetching assignedTo user with ID: $assignedTo");
+        final assignedToDoc = await firestore.collection('users').doc(assignedTo).get();
+        if (assignedToDoc.exists && assignedToDoc.data()?['name'] != null) {
+          details['assignedTo'] = assignedToDoc['name'];
+          print("Assigned To: ${assignedToDoc['name']}");
+        } else {
+          print("Warning: assignedTo user with ID $assignedTo does not exist or has no 'name'.");
+        }
+      }
+
+      // Fetch 'projectName' from 'projects' collection
+      if (projectId != null && projectId.isNotEmpty) {
+        print("Fetching project with ID: $projectId");
+        final projectDoc = await firestore.collection('projects').doc(projectId).get();
+        if (projectDoc.exists && projectDoc.data()?['name'] != null) {
+          details['projectName'] = projectDoc['name'];
+          print("Project Name: ${projectDoc['name']}");
+        } else {
+          print("Warning: project with ID $projectId does not exist or has no 'name'.");
+        }
+      }
+    } catch (e) {
+      print("Error fetching user/project details: $e");
+    }
+
+    print("Final Fetched Details: $details"); // Log the final fetched details
+    return details;
+  }
+
+
+
 
   const TaskDetailView({super.key, required this.taskId});
 
@@ -119,231 +185,73 @@ class TaskDetailView extends StatelessWidget {
       String formattedDeadline,
       String formattedCreationDate,
       TaskFirestoreService taskFirestoreService) {
-    return Card(
-      color: Colors.white,
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Task Description',
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              task.description,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              'Deadline',
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              formattedDeadline,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              'Creation Date',
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              formattedCreationDate,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              'Reward Points',
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              '${task.points} pts',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            const Divider(),
-            Text(
-              'Category',
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              task.category,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            // Keywords section for Research category
-            if (task.category == "Research") ...[
-              const SizedBox(height: 10),
-              const Divider(),
-              Text(
-                'Keywords',
-                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (task.keywords.isNotEmpty)
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 4.0,
-                  children: task.keywords
-                      .map((keyword) => Chip(
-                    label: Text(keyword),
-                    backgroundColor:
-                    AppColors.primaryColor.withOpacity(0.1),
-                    labelStyle:
-                    const TextStyle(color: AppColors.primaryColor),
-                  ))
-                      .toList(),
-                )
-              else
-                Text(
-                  'No Keywords available',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-            ],
-            // Suggested Paper section for Research category
-            if (task.category == "Research") ...[
-              const SizedBox(height: 10),
-              const Divider(),
-              Text(
-                'Suggested Paper',
-                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                  color: AppColors.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (task.suggestedPaper != null &&
-                  task.suggestedPaperUrl != null &&
-                  task.suggestedPaper != "No title available" &&
-                  task.suggestedPaperUrl != "No DOI available") ...[
-                InkWell(
-                  onTap: () async {
-                    final url = Uri.parse(task.suggestedPaperUrl!);
-                    await launchUrl(url);
-                  },
-                  child: Text(
-                    task.suggestedPaper!,
-                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: AppColors.primaryColor,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.add_task),
-                  label: const Text("Add Suggested Paper as Subtask"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    final subTask = SubTask(
-                      title: task.suggestedPaper!,
-                      description: "Suggested research paper",
-                      status: SubtaskStatus.pending,  // Assuming the status should be pending
-                      author: task.suggestedPaperAuthor,
-                      publishDate: task.suggestedPaperPublishDate != null
-                          ? DateTime.parse(task.suggestedPaperPublishDate!)
-                          : null,
-                      url: task.suggestedPaperUrl,
-                    );
+    return FutureBuilder<Map<String, String>>(
+      future: _fetchUserDetails(task.createdBy, task.assignedTo, task.projectId),
+      builder: (context, snapshot) {
+        final userDetails = snapshot.data ?? {};
+        final createdByName = userDetails['createdBy'] ?? "Unknown";
+        final assignedToName = userDetails['assignedTo'] ?? "Not Assigned";
+        final projectName = userDetails['projectName'] ?? "Non-project related";
 
-                    taskFirestoreService.addSubTask(task.id, subTask);  // Use Firestore to add subtask
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Suggested paper added as a subtask!")),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("Refresh Suggested Paper"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: AppColors.primaryColor,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () async {
-                    try {
-                      await taskFirestoreService.refreshSuggestedPaper(task.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Suggested paper refreshed!")),
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Error refreshing suggested paper: $e")),
-                      );
-                    }
-                  },
-                ),
-              ] else
-                Text(
-                  task.suggestedPaper ?? 'No Suggested Paper available',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-            ],
-
-            const SizedBox(height: 10),
-            const Divider(),
-
-            // Completed Checkbox
-            Row(
+        return Card(
+          color: Colors.white,
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Completed',
-                  style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
+                _buildDetailRow("Task Description", task.description),
+                _buildDetailRow("Deadline", formattedDeadline),
+                _buildDetailRow("Creation Date", formattedCreationDate),
+                _buildDetailRow("Created By", createdByName),
+                _buildDetailRow("Assigned To", assignedToName),
+                _buildDetailRow("Project", projectName),
+                if (projectName == "Non-project related")
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      "Note: This task is not associated with any project.",
+                      style: TextStyle(color: Colors.red.shade700, fontStyle: FontStyle.italic),
+                    ),
                   ),
-                ),
-                Checkbox(
-                  value: task.isCompleted,
-                  onChanged: (value) {
-                    taskFirestoreService.toggleTaskCompletion(task);  // Use Firestore to toggle completion
-                  },
-                  activeColor: AppColors.primaryColor,
-                ),
+                const SizedBox(height: 10),
               ],
             ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Helper widget for displaying rows
+  Widget _buildDetailRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "$title: ",
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primaryColor,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
+
 
   // Helper Method for displaying AI feedback
   Widget _buildAiFeedbackSection(BuildContext context, Task task) {
