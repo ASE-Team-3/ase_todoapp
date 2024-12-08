@@ -3,27 +3,38 @@ import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:developer'; // For log function
+
 
 class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String collectionPath = 'tasks';
 
-  Stream<List<Task>> getTasks() {
-    return _db.collection('tasks').snapshots().map(
-          (snapshot) {
-        // Log the raw result of the query (snapshot.docs)
-        print("Snapshot data: ${snapshot.docs}");
+  /// Fetch tasks for the currently logged-in user
+  Stream<List<Task>> getTasksForUser() {
+    final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
-        // Map the Firestore data to Task objects
-        return snapshot.docs.map((doc) {
-          // Log the individual document data
-          print("Document ID: ${doc.id}, Data: ${doc.data()}");
+    if (currentUserId == null) {
+      log("User not logged in. Returning empty task stream.");
+      return const Stream.empty();
+    }
 
-          // Convert document data to Task object
-          return Task.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        }).toList();
-      },
-    );
+    log("Fetching tasks for user ID: $currentUserId");
+
+    return _db
+        .collection(collectionPath)
+        .where('createdBy', isEqualTo: currentUserId) // Filter tasks created by user
+        .snapshots()
+        .map((snapshot) {
+      // Debug: Log the raw snapshot
+      log("Snapshot returned with ${snapshot.docs.length} documents");
+
+      return snapshot.docs.map((doc) {
+        log("Document ID: ${doc.id}, Data: ${doc.data()}");
+        return Task.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+    });
   }
   // Add a task to Firestore
   Future<void> addTask(Task task) async {
