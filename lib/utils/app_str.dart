@@ -103,6 +103,7 @@ class AppStr {
   static const String dueDate = "Due Date";
   static const String priority = "Priority";
   static const String calendar = "Calendar";
+  static const String projects = "Projects";
   static const String pointsHistory = "Points History";
   static const String settings = "Settings";
   static const String details = "Details";

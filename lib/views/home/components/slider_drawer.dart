@@ -144,6 +144,8 @@ class CustomDrawer extends StatelessWidget {
         return Icons.bar_chart;
       case AppStr.list:
         return Icons.list;
+      case AppStr.projects:
+        return Icons.list;
       default:
         return Icons.home;
     }

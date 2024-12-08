@@ -10,7 +10,21 @@ import 'dart:developer'; // For log function
 class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String collectionPath = 'tasks';
+  //final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Fetch tasks for a specific project using projectId
+  Stream<List<Task>> getTasksForProject(String projectId) {
+    return _db
+        .collection('tasks') // Replace with your Firestore collection name
+        .where('projectId', isEqualTo: projectId) // Filter by project ID
+        .snapshots()
+        .map((snapshot) {
+      // Convert Firestore data to a list of Task objects
+      return snapshot.docs.map((doc) {
+        return Task.fromMap(doc.data(), doc.id);
+      }).toList();
+    });
+  }
   /// Fetch tasks for the currently logged-in user
   Stream<List<Task>> getTasksForUser() {
     final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;

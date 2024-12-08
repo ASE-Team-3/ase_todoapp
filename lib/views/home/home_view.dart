@@ -14,6 +14,8 @@ import 'package:firebase_auth/firebase_auth.dart'; // For Authentication
 import 'package:cloud_firestore/cloud_firestore.dart'; // For Firestore
 import 'package:provider/provider.dart';
 import 'package:app/utils/app_str.dart';
+import 'package:app/views/home/widget/project_view.dart'; // Adjust path as needed
+
 
 class HomeView extends StatefulWidget {
   final String initialView;
@@ -34,6 +36,7 @@ class _HomeViewState extends State<HomeView> {
     AppStr.dueDate,
     AppStr.priority,
     AppStr.calendar,
+    AppStr.projects,
     AppStr.pointsHistory,
   ];
 
@@ -146,6 +149,8 @@ class _HomeViewState extends State<HomeView> {
         return const PointsHistoryView();
       case AppStr.list:
         return const TaskListView(); // No need to pass tasks here anymore
+      case AppStr.projects:
+        return const ProjectView(); // No need to pass tasks here anymore
       default:
         return const PointsView();
     }
