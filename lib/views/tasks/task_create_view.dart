@@ -129,19 +129,35 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.grey.shade50, // Subtle light background
         appBar: const TaskViewAppBar(),
         body: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Top Section
               _buildTopSideTexts(textTheme),
-              const SizedBox(height: 16),
-              Expanded(child: _buildMainTaskViewActivity(textTheme, context)),
-              const SizedBox(height: 16),
-              _buildAttachmentsSection(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 2),
+
+              // Main Task View Section
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(), // Smooth scroll effect
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMainTaskViewActivity(textTheme, context),
+                      const SizedBox(height: 8),
+                      _buildAttachmentsSection(),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Section
+              const Divider(thickness: 1.5, color: Colors.grey), // Subtle divider
+              const SizedBox(height: 8),
               _buildBottomSideButtons(),
             ],
           ),
@@ -382,7 +398,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }) {
     return SizedBox(
       width: 150,
-      height: 55,
+      height: 40,
       child: MaterialButton(
         onPressed: onPressed,
         color: color,
@@ -413,20 +429,85 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 8.0, left: 20),
-            child: Text(AppStr.titleOfTitleTextField, style: textTheme.headlineMedium),
+            padding: const EdgeInsets.only(bottom: 2.0, left: 100),
+            child: Text(AppStr.titleOfTitleTextField,
+                style: textTheme.headlineMedium),
           ),
-          RepTextField(
-            controller: titleTaskController,
-            hintText: AppStr.placeholderTitle,
-          ),
-          const SizedBox(height: 16),
-          RepTextField(
-            controller: descriptionTaskController,
-            isForDescription: true,
-            hintText: AppStr.placeholderDescription,
-          ),
-          const SizedBox(height: 16),
+
+    Center(
+    child: SizedBox(
+    width: 335, // Adjust horizontal size
+    height: 50, // Adjust vertical size
+    child: TextField(
+    controller: titleTaskController,
+    maxLines: 1, // Single-line input
+    textAlignVertical: TextAlignVertical.center, // Aligns text to the center
+    decoration: InputDecoration(
+    labelText: AppStr.placeholderTitle, // Floating label
+    floatingLabelBehavior: FloatingLabelBehavior.auto, // Enables floating label animation
+    hintText: '', // No hint text to keep the box as blank
+    border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10), // Rounded edges
+    borderSide: BorderSide(
+    color: Colors.grey.shade400,
+    width: 1.5,
+    ), // Light grey border
+    ),
+    focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: BorderSide(
+    color: Colors.grey.shade600,
+    width: 2,
+    ), // Slightly darker grey on focus
+    ),
+    labelStyle: TextStyle(color: Colors.grey.shade600), // Label text style
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16), // Padding for better alignment
+    ),
+    style: const TextStyle(color: Colors.black), // Black text color
+    ),
+    ),
+    ),
+
+    const SizedBox(height: 10),
+    Center(
+    child: SizedBox(
+    width: 335, // Adjust horizontal size
+    height: 100, // Adjust vertical size
+    child: TextField(
+    controller: descriptionTaskController,
+    maxLines: null, // Allows for multiline input
+    expands: true, // Expands to fill the height of the SizedBox
+    textAlignVertical: TextAlignVertical.top, // Aligns text to the top-left
+    decoration: InputDecoration(
+    labelText: AppStr.placeholderDescription, // Floating label
+    floatingLabelBehavior: FloatingLabelBehavior.auto, // Enables floating label animation
+    hintText: '', // No hint text to keep the box empty
+    hintStyle: TextStyle(color: Colors.grey.shade400), // Hint text style
+    border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10), // Rounded edges
+    borderSide: BorderSide(
+    color: Colors.grey.shade400,
+    width: 1.5,
+    ), // Light grey border
+    ),
+    focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: BorderSide(
+    color: Colors.grey.shade600,
+    width: 2,
+    ), // Slightly darker grey on focus
+    ),
+    labelStyle: TextStyle(color: Colors.grey.shade600), // Label text style
+    contentPadding: const EdgeInsets.all(16), // Adds padding inside the box
+    ),
+    style: const TextStyle(color: Colors.black), // Black text color
+    ),
+    ),
+    ),
+
+
+
+    const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -488,7 +569,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           if (flexibleDeadline == "Specific Deadline") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
@@ -531,15 +612,15 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           _buildRepeatingToggle(textTheme),
           if (isRepeating) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildRepeatIntervalDropdown(textTheme),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildCustomIntervalInput(textTheme),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           AlertFrequencyDropdown(
             alertFrequency: alertFrequency,
             onFrequencyChanged: (value) {
@@ -554,7 +635,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           if (alertFrequency == "custom") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             CustomReminderInput(
               customReminder: customReminder,
               onCustomReminderChanged: (value) {
@@ -564,7 +645,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+
+          // Category Dropdown
           CategoryDropdown(
             selectedCategory: selectedCategory,
             onCategoryChanged: (value) {
@@ -576,7 +659,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               });
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+
+          // Conditionally show Research Section
           if (selectedCategory == "Research") ...[
             ResearchSection(
               keywords: researchKeywords,
@@ -631,7 +716,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     final titleText = widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -640,7 +725,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               titleText,
-              style: textTheme.headlineLarge?.copyWith(
+              style: textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
               ),

@@ -33,39 +33,65 @@ class ResearchSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: keywordController,
-                decoration: InputDecoration(
-                  labelText: "Add a Keyword",
-                  labelStyle: const TextStyle(color: AppColors.primaryColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.primaryColor),
+              child: SizedBox(
+                height: 56, // Matches the height of other dropdowns
+                child: TextField(
+                  controller: keywordController,
+                  decoration: InputDecoration(
+                    labelText: "Add a Keyword",
+                    floatingLabelBehavior: FloatingLabelBehavior.auto, // Enables floating label animation
+                    labelStyle: MaterialStateTextStyle.resolveWith((states) {
+                      if (states.contains(MaterialState.focused)) {
+                        return const TextStyle(
+                          color: Colors.black, // Black when focused
+                          fontWeight: FontWeight.bold, // Bold when focused
+                        );
+                      }
+                      return TextStyle(color: Colors.grey.shade600); // Grey when idle
+                    }),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade400),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade600, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: MaterialStateColor.resolveWith((states) {
+                      if (states.contains(MaterialState.focused)) {
+                        return Colors.white; // White when focused
+                      }
+                      return Colors.grey.shade100; // Light grey when idle
+                    }),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                        color: AppColors.primaryColor, width: 2),
-                  ),
+                  style: const TextStyle(color: Colors.black),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            SizedBox(
+              height: 56, // Matches the height of other dropdowns
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
+                onPressed: () {
+                  if (keywordController.text.trim().isNotEmpty) {
+                    onAddKeyword(keywordController.text.trim());
+                    keywordController.clear();
+                  }
+                },
+                child: const Text("Add"),
               ),
-              onPressed: () {
-                if (keywordController.text.trim().isNotEmpty) {
-                  onAddKeyword(keywordController.text.trim());
-                  keywordController.clear();
-                }
-              },
-              child: const Text("Add"),
             ),
           ],
         ),
@@ -93,14 +119,14 @@ class ResearchSection extends StatelessWidget {
           runSpacing: 4.0,
           children: keywords
               .map((keyword) => Chip(
-                    label: Text(
-                      keyword,
-                      style: const TextStyle(color: Colors.black),
-                    ),
-                    backgroundColor: AppColors.primaryColor.withOpacity(0.1),
-                    deleteIconColor: Colors.red,
-                    onDeleted: () => onRemoveKeyword(keyword),
-                  ))
+            label: Text(
+              keyword,
+              style: const TextStyle(color: Colors.black),
+            ),
+            backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+            deleteIconColor: Colors.red,
+            onDeleted: () => onRemoveKeyword(keyword),
+          ))
               .toList(),
         ),
         const SizedBox(height: 16),
