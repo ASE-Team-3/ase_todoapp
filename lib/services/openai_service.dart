@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:app/models/subtask.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:app/models/task.dart';
@@ -273,6 +274,11 @@ User Input: $prompt
 
       log("INFO: Parsed lines from AI response: $lines");
 
+      // Fetch current user's ID
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "Unknown";
+
+      log("INFO: Current User ID: $currentUserId");
+
       // Helper to safely extract field values
       String getFieldValue(String prefix) {
         final line = lines.firstWhere(
@@ -380,6 +386,7 @@ User Input: $prompt
         deadline: parsedDeadline,
         flexibleDeadline: flexibleDeadline,
         priority: parsedPriority,
+        createdBy: currentUserId,
         keywords: keywords,
         category: category,
         subTasks: subTasks,

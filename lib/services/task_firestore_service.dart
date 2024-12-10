@@ -1,8 +1,11 @@
+import 'dart:developer';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
