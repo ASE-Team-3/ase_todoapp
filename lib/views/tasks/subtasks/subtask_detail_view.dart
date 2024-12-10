@@ -1,3 +1,4 @@
+import 'package:app/providers/task_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/subtask_item.dart';
@@ -24,13 +25,14 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
   final _itemTitleController = TextEditingController();
 
   // Function to add a new item to a subtask
-  void _addItem(TaskFirestoreService taskService) {
+  void _addItem(TaskProvider taskProvider) {
     if (_formKey.currentState!.validate()) {
       final newItem = SubTaskItem(title: _itemTitleController.text);
 
       // Add the new item using the Firestore service
-      taskService.addSubTaskItem(widget.taskId, widget.subTaskId, newItem);
-      _itemTitleController.clear(); // Clear the input field after adding the item
+      taskProvider.addSubTaskItem(widget.taskId, widget.subTaskId, newItem);
+      _itemTitleController
+          .clear(); // Clear the input field after adding the item
     }
   }
 
@@ -39,7 +41,8 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
     // Fetching task from Firestore using FutureBuilder
     return FutureBuilder<Task>(
       future: Provider.of<TaskFirestoreService>(context, listen: false)
-          .getTaskById(widget.taskId),  // Using the Firestore service to get the task
+          .getTaskById(
+              widget.taskId), // Using the Firestore service to get the task
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -58,7 +61,8 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
           );
         } else if (snapshot.hasData) {
           final task = snapshot.data!;
-          final subTask = task.subTasks.firstWhere((st) => st.id == widget.subTaskId);
+          final subTask =
+              task.subTasks.firstWhere((st) => st.id == widget.subTaskId);
 
           return Scaffold(
             backgroundColor: Colors.white,
@@ -86,9 +90,9 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
                   Text(
                     'Items',
                     style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: AppColors.primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 10),
                   // Display items for the subtask
@@ -116,7 +120,8 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
                                   value: item.isCompleted,
                                   onChanged: (value) {
                                     // Using Firestore service to toggle completion
-                                    Provider.of<TaskFirestoreService>(context, listen: false)
+                                    Provider.of<TaskFirestoreService>(context,
+                                            listen: false)
                                         .toggleSubTaskItemCompletion(
                                       widget.taskId,
                                       widget.subTaskId,
@@ -127,10 +132,12 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
                                 ),
                                 // Delete button for subtask item
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
                                   onPressed: () {
                                     // Using Firestore service to remove subtask item
-                                    Provider.of<TaskFirestoreService>(context, listen: false)
+                                    Provider.of<TaskFirestoreService>(context,
+                                            listen: false)
                                         .removeSubTaskItem(
                                       widget.taskId,
                                       widget.subTaskId,
@@ -156,15 +163,15 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
                             controller: _itemTitleController,
                             decoration: InputDecoration(
                               labelText: 'New Item',
-                              labelStyle:
-                              const TextStyle(color: AppColors.primaryColor),
+                              labelStyle: const TextStyle(
+                                  color: AppColors.primaryColor),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                const BorderSide(color: AppColors.primaryColor),
+                                borderSide: const BorderSide(
+                                    color: AppColors.primaryColor),
                               ),
                             ),
                             validator: (value) {
@@ -178,8 +185,11 @@ class _SubTaskDetailViewState extends State<SubTaskDetailView> {
                         const SizedBox(width: 10),
                         // Button to add new item
                         IconButton(
-                          icon: const Icon(Icons.add, color: AppColors.primaryColor),
-                          onPressed: () => _addItem(Provider.of<TaskFirestoreService>(context, listen: false)),
+                          icon: const Icon(Icons.add,
+                              color: AppColors.primaryColor),
+                          onPressed: () => _addItem(Provider.of<TaskProvider>(
+                              context,
+                              listen: false)),
                         ),
                       ],
                     ),

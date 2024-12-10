@@ -8,23 +8,70 @@ class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String collectionPath = 'tasks';
 
+  // Fetch all tasks along with their subtasks from Firestore
   Stream<List<Task>> getTasks() {
-    return _db.collection('tasks').snapshots().map(
-          (snapshot) {
-        // Log the raw result of the query (snapshot.docs)
-        print("Snapshot data: ${snapshot.docs}");
+    return _db
+        .collection(collectionPath)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Task> tasks = [];
 
-        // Map the Firestore data to Task objects
-        return snapshot.docs.map((doc) {
-          // Log the individual document data
-          print("Document ID: ${doc.id}, Data: ${doc.data()}");
+      print("Debug: Starting to fetch tasks from Firestore...");
 
-          // Convert document data to Task object
-          return Task.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        }).toList();
-      },
-    );
+      for (var doc in snapshot.docs) {
+        try {
+          final taskData = doc.data();
+          final taskId = doc.id;
+
+          print("Debug: Task ID: $taskId, Raw Task Data: $taskData");
+
+          // Fetch subtasks for this task
+          final subTasksSnapshot = await _db
+              .collection(collectionPath)
+              .doc(taskId)
+              .collection('subtasks')
+              .get();
+
+          print(
+              "Debug: Fetched ${subTasksSnapshot.docs.length} subtasks for Task ID: $taskId");
+
+          // Convert Firestore data to SubTask list
+          final subtasks = subTasksSnapshot.docs.map((subDoc) {
+            print("Debug: SubTask Data for Task ID $taskId: ${subDoc.data()}");
+            return SubTask.fromMap(subDoc.data());
+          }).toList();
+
+          // Add the task with its subtasks
+          final task =
+              Task.fromMap(taskData, taskId).copyWith(subTasks: subtasks);
+          tasks.add(task);
+
+          // Debug the complete Task object
+          print("Debug: Complete Task Object for Task ID $taskId:");
+          print("Title: ${task.title}");
+          print("Description: ${task.description}");
+          print("Deadline: ${task.deadline}");
+          print("Subtasks Count: ${task.subTasks.length}");
+          for (var subtask in task.subTasks) {
+            print(
+                "  - SubTask Title: ${subtask.title}, Completed: ${subtask.isCompleted}");
+          }
+
+          print(
+              "Debug: Task '$taskId' with ${subtasks.length} subtasks added to the list.");
+        } catch (e, stackTrace) {
+          print(
+              "Error: Failed to process task or subtasks. Task ID: ${doc.id}");
+          print("Error Details: $e");
+          print("Stack Trace: $stackTrace");
+        }
+      }
+
+      print("Debug: Finished fetching tasks. Total tasks: ${tasks.length}");
+      return tasks;
+    });
   }
+
   // Add a task to Firestore
   Future<void> addTask(Task task) async {
     try {
@@ -36,17 +83,78 @@ class TaskFirestoreService {
     }
   }
 
-  // Get a task by its ID from Firestore
+  // Stream to get a task with its subtasks
+  Stream<Task> getTaskStreamById(String taskId) {
+    return _db.collection(collectionPath).doc(taskId).snapshots().asyncMap(
+      (taskSnapshot) async {
+        if (taskSnapshot.exists) {
+          // Fetch the subtasks
+          final subTasksSnapshot = await _db
+              .collection(collectionPath)
+              .doc(taskId)
+              .collection('subtasks')
+              .get();
+
+          final subtasks = subTasksSnapshot.docs
+              .map((subDoc) => SubTask.fromMap(subDoc.data()))
+              .toList();
+
+          // Return the task with its subtasks
+          return Task.fromMap(
+                  taskSnapshot.data() as Map<String, dynamic>, taskId)
+              .copyWith(subTasks: subtasks);
+        } else {
+          throw Exception("Task not found");
+        }
+      },
+    );
+  }
+
+  // Get a task by its ID from Firestore, including its subtasks
   Future<Task> getTaskById(String taskId) async {
     try {
-      DocumentSnapshot taskSnapshot = await _db.collection(collectionPath).doc(taskId).get();
+      print("Debug: Fetching task with ID: $taskId");
+
+      // Step 1: Fetch the task document
+      DocumentSnapshot taskSnapshot =
+          await _db.collection(collectionPath).doc(taskId).get();
+
       if (taskSnapshot.exists) {
-        return Task.fromMap(taskSnapshot.data() as Map<String, dynamic>, taskSnapshot.id);
+        print("Debug: Task document found for ID: $taskId");
+
+        // Step 2: Fetch subtasks from the 'subtasks' subcollection
+        final subTasksSnapshot = await _db
+            .collection(collectionPath)
+            .doc(taskId)
+            .collection('subtasks')
+            .get();
+
+        print(
+            "Debug: Fetched ${subTasksSnapshot.docs.length} subtasks for Task ID: $taskId");
+
+        // Step 3: Convert subtasks to a list of SubTask objects
+        final subtasks = subTasksSnapshot.docs.map((subDoc) {
+          print("Debug: SubTask Data: ${subDoc.data()}");
+          return SubTask.fromMap(subDoc.data());
+        }).toList();
+
+        // Step 4: Construct the Task object with subtasks
+        final task = Task.fromMap(
+          taskSnapshot.data() as Map<String, dynamic>,
+          taskSnapshot.id,
+        ).copyWith(subTasks: subtasks);
+
+        print(
+            "Debug: Task '${task.title}' fetched successfully with ${subtasks.length} subtasks.");
+
+        return task;
       } else {
+        print("Error: Task with ID $taskId not found in Firestore.");
         throw Exception("Task not found");
       }
-    } catch (e) {
-      print("Error fetching task: $e");
+    } catch (e, stackTrace) {
+      print("Error: Failed to fetch task with ID $taskId - $e");
+      print("Stack Trace: $stackTrace");
       rethrow;
     }
   }
@@ -73,16 +181,35 @@ class TaskFirestoreService {
     }
   }
 
-  // Add a subtask to a task
+// Add a subtask to a task with detailed debugging
   Future<void> addSubTask(String taskId, SubTask subTask) async {
     try {
+      // Step 1: Log the incoming taskId and subTask details
+      print("Debug: Adding subtask to Task ID: $taskId");
+      print(
+          "Debug: SubTask Details - ID: ${subTask.id}, Title: ${subTask.title}, Data: ${subTask.toMap()}");
+
+      // Step 2: Get Firestore references
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTasksRef = taskRef.collection('subtasks');
 
-      await subTasksRef.add(subTask.toMap());
-      print("Subtask added successfully for Task ID: $taskId");
-    } catch (e) {
-      print("Error adding subtask: $e");
+      print(
+          "Debug: Firestore Reference - Collection: $collectionPath, Document: $taskId, Subtasks Collection: subtasks");
+
+      // Step 3: Add the subtask to Firestore
+      await subTasksRef.doc(subTask.id).set(subTask.toMap());
+
+      // Step 4: Log success
+      print(
+          "Success: Subtask '${subTask.title}' added successfully with ID: ${subTask.id} under Task ID: $taskId");
+    } catch (e, stackTrace) {
+      // Step 5: Log error details with stack trace for debugging
+      print(
+          "Error: Failed to add subtask '${subTask.title}' to Task ID: $taskId");
+      print("Error Details: $e");
+      print("Stack Trace: $stackTrace");
+
+      // Step 6: Rethrow the error for further handling
       rethrow;
     }
   }
@@ -130,7 +257,8 @@ class TaskFirestoreService {
         final taskData = taskDoc.data()!;
         final attachments = List.from(taskData['attachments']);
 
-        attachments.removeWhere((attachment) => attachment['id'] == attachmentId);
+        attachments
+            .removeWhere((attachment) => attachment['id'] == attachmentId);
 
         await taskRef.update({'attachments': attachments});
         print("Attachment removed successfully for Task ID: $taskId");
@@ -189,12 +317,17 @@ class TaskFirestoreService {
         print("All repeating tasks deleted for task ${task.id}");
       } else if (option == "this_and_following") {
         // Delete the current task and following repeating tasks
-        await taskRef.collection('repeatingTasks').where('taskId', isEqualTo: task.id).get().then((querySnapshot) {
+        await taskRef
+            .collection('repeatingTasks')
+            .where('taskId', isEqualTo: task.id)
+            .get()
+            .then((querySnapshot) {
           for (var doc in querySnapshot.docs) {
             doc.reference.delete();
           }
         });
-        print("Current and following repeating tasks deleted for task ${task.id}");
+        print(
+            "Current and following repeating tasks deleted for task ${task.id}");
       } else if (option == "only_this") {
         // Delete only the current repeating task
         await taskRef.collection('repeatingTasks').doc(task.id).delete();
@@ -205,6 +338,7 @@ class TaskFirestoreService {
       rethrow; // Propagate the error to be handled by the caller
     }
   }
+
 // Remove a subtask from a task
   Future<void> removeSubTask(String taskId, String subTaskId) async {
     try {
@@ -220,9 +354,9 @@ class TaskFirestoreService {
     }
   }
 
-
   // Update the status of a subtask
-  Future<void> updateSubTaskStatus(String taskId, String subTaskId, SubtaskStatus status) async {
+  Future<void> updateSubTaskStatus(
+      String taskId, String subTaskId, SubtaskStatus status) async {
     try {
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
@@ -235,7 +369,8 @@ class TaskFirestoreService {
   }
 
   // Add a subtask item to a subtask
-  Future<void> addSubTaskItem(String taskId, String subTaskId, SubTaskItem item) async {
+  Future<void> addSubTaskItem(
+      String taskId, String subTaskId, SubTaskItem item) async {
     try {
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
@@ -252,7 +387,8 @@ class TaskFirestoreService {
   }
 
   // Toggle the completion status of a subtask item
-  Future<void> toggleSubTaskItemCompletion(String taskId, String subTaskId, String itemId) async {
+  Future<void> toggleSubTaskItemCompletion(
+      String taskId, String subTaskId, String itemId) async {
     try {
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
@@ -263,7 +399,7 @@ class TaskFirestoreService {
 
       if (itemIndex != -1) {
         final item = items[itemIndex];
-        item['isCompleted'] = !item['isCompleted'];  // Toggle completion status
+        item['isCompleted'] = !item['isCompleted']; // Toggle completion status
 
         await subTaskRef.update({'items': items});
         print("Subtask item completion status toggled for Item ID: $itemId");
@@ -275,7 +411,8 @@ class TaskFirestoreService {
   }
 
   // Remove a subtask item from a subtask
-  Future<void> removeSubTaskItem(String taskId, String subTaskId, String itemId) async {
+  Future<void> removeSubTaskItem(
+      String taskId, String subTaskId, String itemId) async {
     try {
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
@@ -285,7 +422,7 @@ class TaskFirestoreService {
       final itemIndex = items.indexWhere((item) => item['id'] == itemId);
 
       if (itemIndex != -1) {
-        items.removeAt(itemIndex);  // Remove the item
+        items.removeAt(itemIndex); // Remove the item
         await subTaskRef.update({'items': items});
         print("Subtask item removed successfully for Item ID: $itemId");
       }

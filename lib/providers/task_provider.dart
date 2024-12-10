@@ -681,7 +681,7 @@ class TaskProvider extends ChangeNotifier {
   /// Parameters:
   /// - [taskId]: The ID of the task to which the sub-task will be added.
   /// - [subTask]: The sub-task object to be added.
-  void addSubTask(String taskId, SubTask subTask) {
+  Future<void> addSubTask(String taskId, SubTask subTask) async {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
     if (taskIndex != -1) {
       final task = _tasks[taskIndex];
@@ -698,8 +698,7 @@ class TaskProvider extends ChangeNotifier {
         }
       }
 
-      final updatedSubTasks = List<SubTask>.from(task.subTasks)..add(subTask);
-      _tasks[taskIndex] = task.copyWith(subTasks: updatedSubTasks);
+      await _taskService.addSubTask(taskId, subTask);
       notifyListeners();
     } else {
       log("Task with ID $taskId not found. Could not add subtask.");
@@ -728,11 +727,11 @@ class TaskProvider extends ChangeNotifier {
   }
 
   void addSubTaskItem(String taskId, String subTaskId, SubTaskItem item) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    subTask.items.add(item);
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
+    // final task = _tasks.firstWhere((t) => t.id == taskId);
+    // final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
+    _taskService.addSubTaskItem(taskId, subTaskId, item);
+    // subTask.toggleCompletion();
+    // toggleTaskCompletion(task);
     notifyListeners();
   }
 
