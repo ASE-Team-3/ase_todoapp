@@ -1,7 +1,8 @@
+import 'package:app/providers/task_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/subtask.dart';
-import 'package:app/services/task_firestore_service.dart';  // Import Firestore service
+import 'package:app/services/task_firestore_service.dart'; // Import Firestore service
 import 'package:app/utils/app_colors.dart';
 
 class AddSubTaskWidget extends StatefulWidget {
@@ -28,7 +29,7 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
 
       try {
         // Use Firestore service to add the subtask
-        await Provider.of<TaskFirestoreService>(context, listen: false)
+        await Provider.of<TaskProvider>(context, listen: false)
             .addSubTask(widget.taskId, newSubTask);
 
         // Clear the form fields after adding
@@ -72,9 +73,9 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
                 Text(
                   'Add Subtask',
                   style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                    color: AppColors.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
@@ -123,7 +124,7 @@ class _AddSubTaskWidgetState extends State<AddSubTaskWidget> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(
-                    onPressed: _addSubTask,  // Calling the method to add subtask
+                    onPressed: _addSubTask, // Calling the method to add subtask
                     icon: const Icon(Icons.add),
                     label: const Text('Add Subtask'),
                     style: ElevatedButton.styleFrom(

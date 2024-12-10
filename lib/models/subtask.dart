@@ -1,38 +1,45 @@
 import 'package:uuid/uuid.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'subtask_item.dart';  // Ensure you have the correct import for SubTaskItem
+import 'subtask_item.dart';
 
-// Enum to represent subtask status
+// Enum to represent subtask types
+enum SubTaskType { paper, common, other }
+
+// Enum to represent subtask statuses
 enum SubtaskStatus { pending, inProgress, completed }
 
 class SubTask {
   final String id; // Unique identifier for each subtask
   final String title; // Title of the subtask
   final String description; // Description of the subtask
-  final SubtaskStatus status; // Status of the subtask (pending, inProgress, completed)
-  final DateTime creationDate; // Date the subtask was created (stored in UTC)
-  final DateTime updatedAt; // Date the subtask was last updated (stored in UTC)
-  final String? author; // Optional field for the author of the subtask (if applicable)
-  final DateTime? publishDate; // Optional field for the publish date of the subtask (if applicable)
-  final String? url; // Optional URL related to the subtask (if applicable)
-  final List<SubTaskItem> items; // List of SubTaskItems (tasks associated with the subtask)
+  final SubTaskType type; // Type of the subtask (paper, common, other)
+  final SubtaskStatus status; // Status of the subtask
+  final DateTime creationDate; // Creation timestamp
+  final DateTime updatedAt; // Last updated timestamp
+  final String? author; // Optional field for author (used for paper type)
+  final DateTime? publishDate; // Optional publish date (for paper type)
+  final String? url; // Optional URL (for paper type)
+  bool isCompleted; // Completion flag
+  List<SubTaskItem> items; // Subtask items list
 
-  // Constructor for creating a SubTask object
+  // Constructor
   SubTask({
     required this.title,
     required this.description,
-    this.status = SubtaskStatus.pending, // Default status is pending
+    this.type = SubTaskType.common, // Default type
+    this.status = SubtaskStatus.pending, // Default status
     this.author,
     this.publishDate,
     this.url,
+    this.isCompleted = false,
+    List<SubTaskItem>? items,
     DateTime? creationDate,
     DateTime? updatedAt,
     String? id,
-    List<SubTaskItem>? items, // Add the list of SubTaskItems
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate?.toUtc() ?? DateTime.now().toUtc(),
         updatedAt = updatedAt?.toUtc() ?? DateTime.now().toUtc(),
-        items = items ?? [];  // Initialize with an empty list if null
+        items = items ?? [];
 
   // Convert Firestore document data to a Subtask object
   factory SubTask.fromMap(Map<String, dynamic> data) {
@@ -40,15 +47,20 @@ class SubTask {
       id: data['id'] ?? '',
       title: data['title'] ?? '',
       description: data['description'] ?? '',
+      type: _subTaskTypeFromString(data['type'] ?? 'common'),
       status: _subtaskStatusFromString(data['status'] ?? 'pending'),
       creationDate: (data['creationDate'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
-      author: data['author'],  // Optional author field
+      author: data['author'],
       publishDate: data['publishDate'] != null
           ? (data['publishDate'] as Timestamp).toDate()
           : null,
-      url: data['url'],  // Optional URL field
-      items: (data['items'] as List<dynamic>?)?.map((item) => SubTaskItem.fromMap(item)).toList() ?? [],  // Convert items to SubTaskItem list if they exist
+      url: data['url'],
+      isCompleted: data['isCompleted'] ?? false,
+      items: (data['items'] as List<dynamic>?)
+              ?.map((item) => SubTaskItem.fromMap(item))
+              .toList() ??
+          [],
     );
   }
 
@@ -58,26 +70,78 @@ class SubTask {
       'id': id,
       'title': title,
       'description': description,
+      'type': _subTaskTypeToString(type),
       'status': _subtaskStatusToString(status),
       'creationDate': Timestamp.fromDate(creationDate),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'author': author,
-      'publishDate': publishDate != null ? Timestamp.fromDate(publishDate!) : null,
+      'publishDate':
+          publishDate != null ? Timestamp.fromDate(publishDate!) : null,
       'url': url,
-      'items': items.map((item) => item.toMap()).toList(),  // Map SubTaskItem objects to Map
+      'isCompleted': isCompleted,
+      'items': items.map((item) => item.toMap()).toList(),
     };
   }
 
-  // Helper method to convert SubtaskStatus enum to string
+  // Helper method to toggle completion status based on all items
+  void toggleCompletion() {
+    isCompleted = items.every((item) => item.isCompleted);
+  }
+
+  // Create a copy of SubTask with updated fields
+  SubTask copyWith({
+    String? title,
+    String? description,
+    SubTaskType? type,
+    SubtaskStatus? status,
+    String? author,
+    DateTime? publishDate,
+    String? url,
+    bool? isCompleted,
+    List<SubTaskItem>? items,
+    DateTime? creationDate,
+    DateTime? updatedAt,
+    String? id,
+  }) {
+    return SubTask(
+      title: title ?? this.title,
+      description: description ?? this.description,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      author: author ?? this.author,
+      publishDate: publishDate ?? this.publishDate,
+      url: url ?? this.url,
+      isCompleted: isCompleted ?? this.isCompleted,
+      items: items ?? this.items,
+      creationDate: creationDate ?? this.creationDate,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+    );
+  }
+
+  // Helper: Convert SubTaskType enum to String
+  String _subTaskTypeToString(SubTaskType type) {
+    return type.toString().split('.').last;
+  }
+
+  // Helper: Convert String to SubTaskType enum
+  static SubTaskType _subTaskTypeFromString(String type) {
+    return SubTaskType.values.firstWhere(
+      (e) => e.toString().split('.').last == type,
+      orElse: () => SubTaskType.common,
+    );
+  }
+
+  // Helper: Convert SubtaskStatus enum to String
   String _subtaskStatusToString(SubtaskStatus status) {
     return status.toString().split('.').last;
   }
 
-  // Helper method to convert string to SubtaskStatus enum
+  // Helper: Convert String to SubtaskStatus enum
   static SubtaskStatus _subtaskStatusFromString(String status) {
     return SubtaskStatus.values.firstWhere(
-          (e) => e.toString().split('.').last == status,
-      orElse: () => SubtaskStatus.pending, // Default to 'pending' if status is not found
+      (e) => e.toString().split('.').last == status,
+      orElse: () => SubtaskStatus.pending,
     );
   }
 }

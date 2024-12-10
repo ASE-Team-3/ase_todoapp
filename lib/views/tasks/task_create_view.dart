@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:developer';
 import 'package:app/models/attachment.dart';
+import 'package:app/providers/task_provider.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
@@ -44,7 +45,8 @@ class TaskCreateView extends StatefulWidget {
 
 class _TaskCreateViewState extends State<TaskCreateView> {
   final TextEditingController titleTaskController = TextEditingController();
-  final TextEditingController descriptionTaskController = TextEditingController();
+  final TextEditingController descriptionTaskController =
+      TextEditingController();
   final TextEditingController pointsController = TextEditingController();
   DateTime? selectedDeadline;
   String? flexibleDeadline;
@@ -81,7 +83,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in the task title or description first.")),
+        const SnackBar(
+            content:
+                Text("Please fill in the task title or description first.")),
       );
     }
   }
@@ -200,19 +204,37 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.grey.shade50, // Subtle light background
         appBar: const TaskViewAppBar(),
         body: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Top Section
               _buildTopSideTexts(textTheme),
-              const SizedBox(height: 16),
-              Expanded(child: _buildMainTaskViewActivity(textTheme, context)),
-              const SizedBox(height: 16),
-              _buildAttachmentsSection(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 2),
+
+              // Main Task View Section
+              Expanded(
+                child: SingleChildScrollView(
+                  physics:
+                      const BouncingScrollPhysics(), // Smooth scroll effect
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMainTaskViewActivity(textTheme, context),
+                      const SizedBox(height: 8),
+                      _buildAttachmentsSection(),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Section
+              const Divider(
+                  thickness: 1.5, color: Colors.grey), // Subtle divider
+              const SizedBox(height: 8),
               _buildBottomSideButtons(),
             ],
           ),
@@ -234,7 +256,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             onPressed: _deleteTask,
           ),
         _buildButton(
-          label: widget.task == null ? AppStr.addTaskString : AppStr.updateTaskString,
+          label: widget.task == null
+              ? AppStr.addTaskString
+              : AppStr.updateTaskString,
           icon: null,
           color: AppColors.primaryColor,
           onPressed: _saveOrUpdateTask,
@@ -261,7 +285,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         (selectedDeadline != null || flexibleDeadline != null)) {
-      final taskFirestoreService = TaskFirestoreService();  // Use Firestore service
+      final taskFirestoreService =
+          TaskFirestoreService(); // Use Firestore service
+      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       // Validate alert frequency
       if (alertFrequency == "custom" &&
@@ -275,11 +301,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         return;
       }
 
-      final customReminderConfig = (alertFrequency == "custom") ? customReminder : null;
+      final customReminderConfig =
+          (alertFrequency == "custom") ? customReminder : null;
 
       // Prepare common task fields
       final String category = selectedCategory ?? "General";
-      final List<String> keywords = category == "Research" ? researchKeywords : [];
+      final List<String> keywords =
+          category == "Research" ? researchKeywords : [];
       final DateTime? deadline = selectedDeadline;
       final String? flexibleDeadlineOption = flexibleDeadline;
 
@@ -310,7 +338,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
         try {
           // Add task to Firestore
-          await taskFirestoreService.addTask(newTask);
+          taskProvider.addTask(newTask);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task added successfully!")),
           );
@@ -342,8 +370,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
 
         try {
-          // Update task in Firestore
-          await taskFirestoreService.updateTask(updatedTask);
+          if (widget.task!.isRepeating) {
+            // Handle repeating task updates
+            _showUpdateOptionsDialog(taskProvider);
+          } else {
+            // Handle normal task updates
+            taskProvider.updateTask(
+              widget.task!,
+              title: updatedTask.title,
+              description: updatedTask.description,
+              category: updatedTask.category,
+              keywords: updatedTask.keywords,
+              selectedDeadline: updatedTask.deadline,
+              flexibleDeadline: updatedTask.flexibleDeadline,
+              alertFrequency: updatedTask.alertFrequency,
+              customReminder: updatedTask.customReminder,
+              isRepeating: updatedTask.isRepeating,
+              repeatInterval: updatedTask.repeatInterval,
+              customRepeatDays: updatedTask.customRepeatDays,
+              attachments: updatedTask.attachments,
+              points: updatedTask.points,
+            );
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task updated successfully!")),
           );
@@ -364,18 +413,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }
 
   // Show options to update repeating tasks
-  Future<void> _showUpdateOptionsDialog(TaskFirestoreService taskFirestoreService) async {
+  Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
     await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text("Update Repeating Task"),
-          content: const Text("How would you like to update this repeating task?"),
+          content:
+              const Text("How would you like to update this repeating task?"),
           actions: [
             TextButton(
               onPressed: () {
-                taskFirestoreService.updateTask(widget.task!);
+                // Update all repeating tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "all",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
                 _resetFields();
                 Navigator.pop(context);
                 Navigator.pop(context);
@@ -384,7 +444,17 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             ),
             TextButton(
               onPressed: () {
-                taskFirestoreService.updateTask(widget.task!);
+                // Update this task and all subsequent tasks
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "this_and_following",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
                 _resetFields();
                 Navigator.pop(context);
                 Navigator.pop(context);
@@ -393,7 +463,17 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             ),
             TextButton(
               onPressed: () {
-                taskFirestoreService.updateTask(widget.task!);
+                // Update only this specific task occurrence
+                taskProvider.updateRepeatingTasks(
+                  widget.task!,
+                  option: "only_this",
+                  title: titleTaskController.text,
+                  description: descriptionTaskController.text,
+                  points: enteredPoints,
+                  selectedDeadline: selectedDeadline,
+                  repeatInterval: repeatInterval,
+                  customRepeatDays: customRepeatDays,
+                );
                 _resetFields();
                 Navigator.pop(context);
                 Navigator.pop(context);
@@ -451,7 +531,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       try {
         final taskFirestoreService = TaskFirestoreService();
         await taskFirestoreService.deleteTask(widget.task!.id);
-        Navigator.of(context).pop(MaterialPageRoute(builder: (context) => const HomeView()));
+        Navigator.of(context)
+            .pop(MaterialPageRoute(builder: (context) => const HomeView()));
       } catch (e) {
         log('Error deleting task: $e');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -470,7 +551,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }) {
     return SizedBox(
       width: 150,
-      height: 55,
+      height: 40,
       child: MaterialButton(
         onPressed: onPressed,
         color: color,
@@ -478,7 +559,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           borderRadius: BorderRadius.circular(15),
         ),
         child: Row(
-          mainAxisAlignment: icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
+          mainAxisAlignment:
+              icon != null ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
             if (icon != null) Icon(icon, color: AppColors.primaryColor),
             if (icon != null) const SizedBox(width: 8),
@@ -501,20 +583,92 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 8.0, left: 20),
-            child: Text(AppStr.titleOfTitleTextField, style: textTheme.headlineMedium),
+            padding: const EdgeInsets.only(bottom: 2.0, left: 100),
+            child: Text(AppStr.titleOfTitleTextField,
+                style: textTheme.headlineMedium),
           ),
-          RepTextField(
-            controller: titleTaskController,
-            hintText: AppStr.placeholderTitle,
+
+          Center(
+            child: SizedBox(
+              width: 335, // Adjust horizontal size
+              height: 50, // Adjust vertical size
+              child: TextField(
+                controller: titleTaskController,
+                maxLines: 1, // Single-line input
+                textAlignVertical:
+                    TextAlignVertical.center, // Aligns text to the center
+                decoration: InputDecoration(
+                  labelText: AppStr.placeholderTitle, // Floating label
+                  floatingLabelBehavior: FloatingLabelBehavior
+                      .auto, // Enables floating label animation
+                  hintText: '', // No hint text to keep the box as blank
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), // Rounded edges
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade400,
+                      width: 1.5,
+                    ), // Light grey border
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade600,
+                      width: 2,
+                    ), // Slightly darker grey on focus
+                  ),
+                  labelStyle: TextStyle(
+                      color: Colors.grey.shade600), // Label text style
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16), // Padding for better alignment
+                ),
+                style: const TextStyle(color: Colors.black), // Black text color
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          RepTextField(
-            controller: descriptionTaskController,
-            isForDescription: true,
-            hintText: AppStr.placeholderDescription,
+
+          const SizedBox(height: 10),
+          Center(
+            child: SizedBox(
+              width: 335, // Adjust horizontal size
+              height: 100, // Adjust vertical size
+              child: TextField(
+                controller: descriptionTaskController,
+                maxLines: null, // Allows for multiline input
+                expands: true, // Expands to fill the height of the SizedBox
+                textAlignVertical:
+                    TextAlignVertical.top, // Aligns text to the top-left
+                decoration: InputDecoration(
+                  labelText: AppStr.placeholderDescription, // Floating label
+                  floatingLabelBehavior: FloatingLabelBehavior
+                      .auto, // Enables floating label animation
+                  hintText: '', // No hint text to keep the box empty
+                  hintStyle:
+                      TextStyle(color: Colors.grey.shade400), // Hint text style
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), // Rounded edges
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade400,
+                      width: 1.5,
+                    ), // Light grey border
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade600,
+                      width: 2,
+                    ), // Slightly darker grey on focus
+                  ),
+                  labelStyle: TextStyle(
+                      color: Colors.grey.shade600), // Label text style
+                  contentPadding:
+                      const EdgeInsets.all(16), // Adds padding inside the box
+                ),
+                style: const TextStyle(color: Colors.black), // Black text color
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -626,7 +780,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           if (flexibleDeadline == "Specific Deadline") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
@@ -669,15 +823,15 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           _buildRepeatingToggle(textTheme),
           if (isRepeating) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildRepeatIntervalDropdown(textTheme),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildCustomIntervalInput(textTheme),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           AlertFrequencyDropdown(
             alertFrequency: alertFrequency,
             onFrequencyChanged: (value) {
@@ -692,7 +846,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           if (alertFrequency == "custom") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             CustomReminderInput(
               customReminder: customReminder,
               onCustomReminderChanged: (value) {
@@ -702,7 +856,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+
+          // Category Dropdown
           CategoryDropdown(
             selectedCategory: selectedCategory,
             onCategoryChanged: (value) {
@@ -714,7 +870,9 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               });
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+
+          // Conditionally show Research Section
           if (selectedCategory == "Research") ...[
             ResearchSection(
               keywords: researchKeywords,
@@ -751,7 +909,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text("Failed to refresh research suggestions")),
+                        content:
+                            Text("Failed to refresh research suggestions")),
                   );
                 }
               },
@@ -766,10 +925,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
   // Header text section with title for the task form
   Widget _buildTopSideTexts(TextTheme textTheme) {
-    final titleText = widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
+    final titleText =
+        widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -778,7 +938,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               titleText,
-              style: textTheme.headlineLarge?.copyWith(
+              style: textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
               ),
@@ -796,7 +956,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppStr.attachmentsLabel, style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(AppStr.attachmentsLabel,
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -857,7 +1018,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
   // Build the custom interval input for setting custom repeat intervals
   Widget _buildCustomIntervalInput(TextTheme textTheme) {
-    if (!isRepeating || repeatInterval != "custom") return const SizedBox.shrink();
+    if (!isRepeating || repeatInterval != "custom")
+      return const SizedBox.shrink();
 
     return CustomIntervalInput(
       customRepeatDays: customRepeatDays,

@@ -12,13 +12,11 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     try {
-      // Attempt to log in the user
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Log success and navigate to the home screen
       print('Login successful for user: ${_emailController.text}');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login successful!')),
@@ -27,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
     } on FirebaseAuthException catch (e) {
       String errorMessage;
 
-      // Handle specific FirebaseAuth errors
       switch (e.code) {
         case 'user-not-found':
           errorMessage = 'No account found for this email.';
@@ -45,17 +42,12 @@ class _LoginPageState extends State<LoginPage> {
           errorMessage = 'An unexpected error occurred. Please try again.';
       }
 
-      // Log failure
       print('Login failed: $errorMessage');
-
-      // Display user-friendly error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage)),
       );
     } catch (e) {
-      // Log unexpected errors
       print('Unexpected error: ${e.toString()}');
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('An unexpected error occurred.')),
       );
@@ -65,24 +57,89 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      backgroundColor: const Color(0xFFF2F2F7), // iOS-like light gray background
+      appBar: AppBar(
+        title: null, // Remove the default title
+        centerTitle: true, // Center the content
+        flexibleSpace: Container(
+          margin: const EdgeInsets.only(top: 20.0), // Push the box down
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.0), // Rounded corners
+            border: Border.all(color: Colors.white, width: 2.0), // White border
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1565C0), Color(0xFF6FBEDC)], // Dark to light blue
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Text(
+            'Login',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        elevation: 0, // No shadow
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Logo at the top
+            Image.asset(
+              'assets/logo.png', // Ensure this path matches your asset location
+              height: 120,
+              width: 120,
+            ),
+            const SizedBox(height: 20), // Spacing below the logo
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8), // Slightly off-white background
+                labelStyle: const TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFDADCE0)), // Gray border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF6FBEDC)), // Soft blue border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
               keyboardType: TextInputType.emailAddress,
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8), // Slightly off-white background
+                labelStyle: const TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFDADCE0)), // Gray border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF6FBEDC)), // Soft blue border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6FBEDC), // Soft blue button color
+                foregroundColor: Colors.white, // White text color
+              ),
               onPressed: _login,
               child: const Text('Login'),
             ),
@@ -90,7 +147,10 @@ class _LoginPageState extends State<LoginPage> {
               onPressed: () {
                 Navigator.pushNamed(context, '/register');
               },
-              child: const Text('Register'),
+              child: const Text(
+                'Register',
+                style: TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+              ),
             ),
           ],
         ),

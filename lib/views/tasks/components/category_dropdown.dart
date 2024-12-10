@@ -15,16 +15,16 @@ class CategoryDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal:20),
       decoration: BoxDecoration(
-        color: Colors.white,
+
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
             spreadRadius: 2,
-            blurRadius: 5,
+            blurRadius: 10000,
             offset: const Offset(0, 3),
           ),
         ],
@@ -35,26 +35,28 @@ class CategoryDropdown extends StatelessWidget {
         decoration: InputDecoration(
           labelText: "Task Category",
           labelStyle: const TextStyle(
-            color: AppColors.primaryColor,
+            color: Colors.black, // Light grey color
             fontWeight: FontWeight.bold,
           ),
+
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.primaryColor),
+            borderSide: BorderSide(color: Colors.grey.shade500), // Light grey border
           ),
+
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                const BorderSide(color: AppColors.primaryColor, width: 2),
+            borderSide: BorderSide(color: Colors.grey.shade500, width: 2), // Light grey border
+
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                BorderSide(color: AppColors.primaryColor.withOpacity(0.6)),
+            borderSide: BorderSide(color: Colors.grey.shade500), // Light grey border
           ),
+
         ),
         dropdownColor: Colors.white,
-        icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
+        icon: Icon(Icons.arrow_drop_down, color: Colors.black),
         style: const TextStyle(
           color: Colors.black,
           fontWeight: FontWeight.w500,
@@ -64,7 +66,7 @@ class CategoryDropdown extends StatelessWidget {
             value: category,
             child: Text(
               category,
-              style: const TextStyle(color: Colors.black),
+              style: const TextStyle(color: Colors.grey),
             ),
           );
         }).toList(),

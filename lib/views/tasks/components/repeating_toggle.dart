@@ -1,4 +1,3 @@
-// views\tasks\components\repeating_toggle.dart
 import 'package:flutter/material.dart';
 
 class RepeatingToggle extends StatelessWidget {
@@ -13,13 +12,19 @@ class RepeatingToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
-      title: Text(
-        "Repeat Task",
-        style: Theme.of(context).textTheme.bodyLarge,
+    return Center(
+      child: SizedBox(
+        width: 300, // Adjust horizontal size
+        height: 50, // Adjust vertical size
+        child: SwitchListTile(
+          title: Text(
+            "Repeat Task",
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          value: isRepeating,
+          onChanged: onChanged,
+        ),
       ),
-      value: isRepeating,
-      onChanged: onChanged,
     );
   }
 }
