@@ -67,28 +67,107 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
+      backgroundColor: const Color(0xFFF2F2F7), // iOS-like light gray background
+      appBar: AppBar(
+        title: null,
+        centerTitle: true,
+        flexibleSpace: Container(
+          margin: const EdgeInsets.only(top: 20.0), // Push the box down
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.0), // Rounded corners
+            border: Border.all(color: Colors.white, width: 2.0), // White border
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1565C0), Color(0xFF6FBEDC)], // Dark to light blue
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Text(
+            'Register',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        elevation: 0,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Logo at the top
+            Image.asset(
+              'assets/logo.png', // Ensure this path matches your asset location
+              height: 120,
+              width: 120,
+            ),
+            const SizedBox(height: 20), // Spacing below the logo
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(
+                labelText: 'Name',
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8), // Slightly off-white background
+                labelStyle: const TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFDADCE0)), // Gray border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF6FBEDC)), // Soft blue border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8), // Slightly off-white background
+                labelStyle: const TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFDADCE0)), // Gray border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF6FBEDC)), // Soft blue border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
               keyboardType: TextInputType.emailAddress,
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                filled: true,
+                fillColor: const Color(0xFFF8F8F8), // Slightly off-white background
+                labelStyle: const TextStyle(color: Color(0xFF5A8BB0)), // Light blue text
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFDADCE0)), // Gray border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF6FBEDC)), // Soft blue border
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6FBEDC), // Soft blue button color
+                foregroundColor: Colors.white, // White text color
+              ),
               onPressed: _register,
               child: const Text('Register'),
             ),

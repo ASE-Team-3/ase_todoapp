@@ -16,19 +16,38 @@ class Fab extends StatelessWidget {
         _showTaskCreationOptions(context);
       },
       child: Material(
-        borderRadius: BorderRadius.circular(15),
-        elevation: 10,
+        borderRadius:
+            BorderRadius.circular(25), // Smaller radius for compact shape
+        elevation: 8, // Reduced elevation for a subtler shadow
+        shadowColor: AppColors.primaryColor.withOpacity(0.3),
         child: Container(
-          width: 70,
-          height: 70,
+          width: 55, // Smaller width
+          height: 55, // Smaller height
           decoration: BoxDecoration(
-            color: AppColors.primaryColor,
-            borderRadius: BorderRadius.circular(15),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primaryGradientColor[0]
+                    .withOpacity(0.8), // Subtler start color
+                AppColors.primaryGradientColor[1]
+                    .withOpacity(0.8), // Subtler end color
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryColor.withOpacity(0.2),
+                blurRadius: 12,
+                offset: Offset(0, 6),
+              ),
+            ],
           ),
           child: const Center(
             child: Icon(
               Icons.add,
               color: Colors.white,
+              size: 24, // Reduced icon size
             ),
           ),
         ),

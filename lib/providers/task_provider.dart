@@ -16,6 +16,8 @@ import 'package:app/models/attachment.dart';
 import 'package:app/providers/points_manager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firebase Firestore import
+import 'package:app/services/task_firestore_service.dart'; // Firebase service for tasks
 
 class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
@@ -24,17 +26,20 @@ class TaskProvider extends ChangeNotifier {
   final PointsManager _pointsManager =
       PointsManager(); // PointsManager instance
   final NotificationThrottler _notificationThrottler = NotificationThrottler();
+  final TaskFirestoreService _taskService =
+      TaskFirestoreService(); // Firestore service
 
   TaskProvider(FlutterLocalNotificationsPlugin plugin,
       {required ResearchService researchService})
       : _notificationService = NotificationService(plugin),
         _researchService = researchService {
     _notificationService.initialize();
+    loadTasks(); // Load tasks from Firestore on initialization
+    log('TaskProvider initialized and tasks loaded.');
   }
+
   List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
-
   int get totalPoints => _pointsManager.totalPoints;
-
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
   /// This function retrieves the list of tasks with their `DateTime` fields
@@ -49,11 +54,11 @@ class TaskProvider extends ChangeNotifier {
   /// - All operations on tasks (e.g., filtering by deadline) should use
   ///   the output of this function to ensure correct time interpretation.
   ///
+  ///
   /// Returns:
   /// - A `List<Task>` where all `DateTime` fields are converted to local time.
   List<Task> Function() get tasks => () {
         return _tasks.map((task) {
-          // Convert deadline to local time before returning
           return task.copyWith(
             creationDate: convertUtcToLocal(task.creationDate),
             deadline: convertUtcToLocal(task.deadline),
@@ -62,10 +67,23 @@ class TaskProvider extends ChangeNotifier {
         }).toList();
       };
 
+  /// Loads tasks from Firestore and updates the local task list.
+  void loadTasks() {
+    log('Loading tasks from Firestore...');
+    _taskService.getTasks().listen((tasksFromFirestore) {
+      _tasks.clear();
+      _tasks.addAll(tasksFromFirestore); // Add the fetched tasks to the list
+      notifyListeners(); // Notify listeners to update the UI
+      log('Tasks loaded from Firestore and updated.');
+    });
+  }
+
+  /// Adds a task to Firestore and schedules notifications if necessary.
   void addTask(Task task) async {
-    // Handle research-specific tasks
+    log('Adding task: ${task.title}');
     if (task.category == "Research") {
       task = await _prepareResearchTask(task);
+      log('Research task prepared: ${task.title}');
     }
 
     // Ensure deadlines are in UTC
@@ -75,14 +93,12 @@ class TaskProvider extends ChangeNotifier {
       customReminder: task.customReminder, // Handle custom reminder
     );
 
-    // Handle flexible deadlines
     if (task.flexibleDeadline != null && task.deadline == null) {
       final localDeadline =
           calculateDeadlineFromFlexible(task.flexibleDeadline!);
       task = task.copyWith(deadline: localDeadline?.toUtc());
     }
 
-    // Schedule notification if the task is incomplete and has a deadline
     if (!task.isCompleted && task.deadline != null) {
       _notificationService.scheduleNotification(
         title: 'Task Reminder',
@@ -91,8 +107,8 @@ class TaskProvider extends ChangeNotifier {
         alertFrequency: task.alertFrequency,
         customReminder: task.customReminder,
       );
+      log('Notification scheduled for task: ${task.title}');
     }
-
     // Handle repeating tasks
     if (task.isRepeating) {
       final repeatingGroupId = const Uuid().v4();
@@ -100,13 +116,15 @@ class TaskProvider extends ChangeNotifier {
       _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
       // Add single instance task to the list
-      _tasks.add(task);
+      await _taskService.addTask(task);
+      log('Task added to Firestore: ${task.title}');
     }
 
     // Notify listeners about the new task
     notifyListeners();
   }
 
+  /// Prepares a research task by generating keywords and fetching related papers.
   Future<Task> _prepareResearchTask(Task task) async {
     // Check if the task already has keywords
     if (task.keywords.isEmpty) {
@@ -114,6 +132,7 @@ class TaskProvider extends ChangeNotifier {
       final generatedKeywords =
           KeywordGenerator.generate(task.title, task.description);
       task = task.copyWith(keywords: generatedKeywords);
+      log('Keywords generated for research task: ${task.title}');
     }
 
     // Fetch Related Research Papers
@@ -127,9 +146,11 @@ class TaskProvider extends ChangeNotifier {
           suggestedPaperAuthor: relatedPapers[0]['author'],
           suggestedPaperPublishDate: relatedPapers[0]['publishDate'],
         );
+        log('Research papers found and added to task: ${task.title}');
       }
     } catch (e) {
       log("Error fetching research papers: $e");
+      throw Exception("Failed to refresh suggested paper: $e");
     }
 
     return task;
@@ -230,17 +251,20 @@ class TaskProvider extends ChangeNotifier {
       title: 'Updated Reminder',
     );
 
+    await _taskService.updateTask(updatedTask);
+    log('Task updated in Firestore: ${task.title}');
+
+    // Regenerate repeating tasks if needed
+    if (updatedTask.isRepeating) {
+      _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
+    }
+
     // Find the task index and update it
     final index = _tasks.indexWhere((t) => t.id == task.id);
     if (index != -1) {
       _tasks[index] = updatedTask;
-
-      // Regenerate repeating tasks if needed
-      if (updatedTask.isRepeating) {
-        _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
-      }
-
       notifyListeners();
+      log('Task updated in local list: ${task.title}');
     } else {
       log('Task with ID ${task.id} not found for update.');
     }

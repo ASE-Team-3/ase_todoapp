@@ -5,7 +5,7 @@ class AppStr {
   static const String addNewTask = "Add New Task";
   static const String updateCurrentTask = "Update Task";
   static const String taskStrnig = "Task";
-  static const String titleOfTitleTextField = "What are you planning😇?";
+  static const String titleOfTitleTextField = "What are you planning?";
   static const String addNote = 'Add Note';
   static const String placeholderTitle = "Enter task title";
   static const String placeholderDescription = "Enter task description";

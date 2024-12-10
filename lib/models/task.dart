@@ -1,25 +1,23 @@
 import 'package:uuid/uuid.dart';
 import 'package:app/models/subtask.dart'; // Import SubTask model
 import 'package:app/models/attachment.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Task {
   final String id; // UUID
   final String title;
   final String description;
   final DateTime? deadline; // Store in UTC
-  final String?
-      flexibleDeadline; // Flexible deadline (e.g., "Today", "This Week")
+  final String? flexibleDeadline; // Flexible deadline (e.g., "Today", "This Week")
   final DateTime creationDate; // Store in UTC
   final DateTime updatedAt; // Store in UTC
   final int priority; // Priority field (1 for high, 2 for medium, 3 for low)
   final bool isRepeating; // Indicates whether the task repeats
-  final String?
-      repeatInterval; // "daily", "weekly", "monthly", "yearly", or "custom"
+  final String? repeatInterval; // "daily", "weekly", "monthly", "yearly", or "custom"
   final int? customRepeatDays; // Number of days for custom intervals
   final DateTime? nextOccurrence; // Next occurrence for repeating tasks
   final String? repeatingGroupId; // Group ID for repeating tasks
-  final String?
-      alertFrequency; // "once", "hourly", "daily" for notification frequency
+  final String? alertFrequency; // "once", "hourly", "daily" for notification frequency
   List<Attachment> attachments;
   bool isCompleted;
   List<SubTask> subTasks; // List of SubTasks
@@ -65,6 +63,73 @@ class Task {
         subTasks = subTasks ?? [],
         keywords = keywords ?? []; // Initialize empty keyword list if null
 
+  // Convert Firestore data to a Task object
+  factory Task.fromMap(Map<String, dynamic> data, String documentId) {
+    return Task(
+      id: documentId,
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      deadline: (data['deadline'] as Timestamp?)?.toDate(),
+      flexibleDeadline: data['flexibleDeadline'],
+      creationDate: (data['creationDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      priority: data['priority'] ?? 2,
+      isRepeating: data['isRepeating'] ?? false,
+      repeatInterval: data['repeatInterval'],
+      customRepeatDays: data['customRepeatDays'],
+      nextOccurrence: (data['nextOccurrence'] as Timestamp?)?.toDate(),
+      repeatingGroupId: data['repeatingGroupId'],
+      alertFrequency: data['alertFrequency'] ?? 'once',
+      attachments: (data['attachments'] as List?)
+          ?.map((item) => Attachment.fromMap(item))
+          .toList() ?? [],
+      isCompleted: data['isCompleted'] ?? false,
+      subTasks: (data['subTasks'] as List?)
+          ?.map((item) => SubTask.fromMap(item))
+          .toList() ?? [],
+      points: int.tryParse(data['points']?.toString() ?? '0') ?? 0, // Safely convert points to int
+      customReminder: data['customReminder'],
+      category: data['category'] ?? 'General',
+      keywords: List<String>.from(data['keywords'] ?? []),
+      suggestedPaper: data['suggestedPaper'],
+      suggestedPaperUrl: data['suggestedPaperUrl'],
+      suggestedPaperAuthor: data['suggestedPaperAuthor'],
+      suggestedPaperPublishDate: data['suggestedPaperPublishDate'],
+    );
+  }
+
+  // Convert a Task object to a Map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'description': description,
+      'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
+      'flexibleDeadline': flexibleDeadline,
+      'creationDate': Timestamp.fromDate(creationDate),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'priority': priority,
+      'isRepeating': isRepeating,
+      'repeatInterval': repeatInterval,
+      'customRepeatDays': customRepeatDays,
+      'nextOccurrence': nextOccurrence != null
+          ? Timestamp.fromDate(nextOccurrence!)
+          : null,
+      'repeatingGroupId': repeatingGroupId,
+      'alertFrequency': alertFrequency,
+      'attachments': attachments.map((e) => e.toMap()).toList(),
+      'isCompleted': isCompleted,
+      'subTasks': subTasks.map((e) => e.toMap()).toList(),
+      'points': points,
+      'customReminder': customReminder,
+      'category': category,
+      'keywords': keywords,
+      'suggestedPaper': suggestedPaper,
+      'suggestedPaperUrl': suggestedPaperUrl,
+      'suggestedPaperAuthor': suggestedPaperAuthor,
+      'suggestedPaperPublishDate': suggestedPaperPublishDate,
+    };
+  }
+
   Task copyWith({
     String? id,
     String? title,
@@ -102,16 +167,11 @@ class Task {
       updatedAt: updatedAt?.toUtc() ?? DateTime.now().toUtc(),
       priority: priority ?? this.priority, // Set the new priority field
       isRepeating: isRepeating ?? this.isRepeating, // Update isRepeating field
-      repeatInterval:
-          repeatInterval ?? this.repeatInterval, // Update repeatInterval
-      customRepeatDays:
-          customRepeatDays ?? this.customRepeatDays, // Update customRepeatDays
-      nextOccurrence:
-          nextOccurrence ?? this.nextOccurrence, // Update nextOccurrence
-      repeatingGroupId:
-          repeatingGroupId ?? this.repeatingGroupId, // Update repeatingGroupId
-      alertFrequency:
-          alertFrequency ?? this.alertFrequency, // Update alertFrequency
+      repeatInterval: repeatInterval ?? this.repeatInterval, // Update repeatInterval
+      customRepeatDays: customRepeatDays ?? this.customRepeatDays, // Update customRepeatDays
+      nextOccurrence: nextOccurrence ?? this.nextOccurrence, // Update nextOccurrence
+      repeatingGroupId: repeatingGroupId ?? this.repeatingGroupId, // Update repeatingGroupId
+      alertFrequency: alertFrequency ?? this.alertFrequency, // Update alertFrequency
       attachments: attachments ?? this.attachments,
       isCompleted: isCompleted ?? this.isCompleted,
       subTasks: subTasks ?? this.subTasks,
@@ -122,8 +182,7 @@ class Task {
       suggestedPaper: suggestedPaper ?? this.suggestedPaper,
       suggestedPaperUrl: suggestedPaperUrl ?? this.suggestedPaperUrl,
       suggestedPaperAuthor: suggestedPaperAuthor ?? this.suggestedPaperAuthor,
-      suggestedPaperPublishDate:
-          suggestedPaperPublishDate ?? this.suggestedPaperPublishDate,
+      suggestedPaperPublishDate: suggestedPaperPublishDate ?? this.suggestedPaperPublishDate,
     );
   }
 }

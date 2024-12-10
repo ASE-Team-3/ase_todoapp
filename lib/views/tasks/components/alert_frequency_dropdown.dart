@@ -26,33 +26,76 @@ class AlertFrequencyDropdown extends StatelessWidget {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: alertFrequency ?? "5_minutes",
-            items: const [
+            items: [
               DropdownMenuItem(
                 value: "5_minutes",
-                child: Text(AppStr.alertFrequency5Minutes),
+                child: Text(
+                  AppStr.alertFrequency5Minutes,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: "1_hour",
-                child: Text(AppStr.alertFrequency1Hour),
+                child: Text(
+                  AppStr.alertFrequency1Hour,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: "2_hours",
-                child: Text(AppStr.alertFrequency2Hours),
+                child: Text(
+                  AppStr.alertFrequency2Hours,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: "3_hours",
-                child: Text(AppStr.alertFrequency3Hours),
+                child: Text(
+                  AppStr.alertFrequency3Hours,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: "1_day",
-                child: Text(AppStr.alertFrequency1Day),
+                child: Text(
+                  AppStr.alertFrequency1Day,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
               DropdownMenuItem(
                 value: "custom",
-                child: Text(AppStr.alertFrequencyCustom),
+                child: Text(
+                  AppStr.alertFrequencyCustom,
+                  style: TextStyle(
+                    color: Colors.grey.shade500, // Lighter grey
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
               ),
             ],
             onChanged: onFrequencyChanged,
+            dropdownColor: Colors.white, // Dropdown menu background color
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),

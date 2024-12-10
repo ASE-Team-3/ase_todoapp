@@ -1,4 +1,3 @@
-// views/home/widget/calendar_view.dart
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:app/models/task.dart';
@@ -43,85 +42,112 @@ class _CalendarViewState extends State<CalendarView> {
               .toList(),
           calendarStyle: CalendarStyle(
             markerDecoration: BoxDecoration(
-              color: Colors.blueAccent,
+              color: const Color(0xFF007AFF), // iOS blue
               shape: BoxShape.circle,
             ),
             todayDecoration: BoxDecoration(
-              color: Colors.orange,
+              color: const Color(0xFFFFD60A), // iOS yellow for today
               shape: BoxShape.circle,
             ),
             selectedDecoration: BoxDecoration(
-              color: Colors.blue,
+              color: const Color(0xFF34C759), // iOS green for selected day
               shape: BoxShape.circle,
+            ),
+            weekendTextStyle: const TextStyle(
+              color: Colors.grey, // Light gray for weekends
+            ),
+            defaultTextStyle: const TextStyle(
+              color: Colors.black87, // Default text color
+            ),
+            outsideTextStyle: const TextStyle(
+              color: Colors.grey, // Faded color for days outside the month
+            ),
+          ),
+          daysOfWeekStyle: DaysOfWeekStyle(
+            weekendStyle: const TextStyle(
+              color: Colors.grey, // Light gray for Saturday and Sunday headers
+              fontWeight: FontWeight.bold,
+            ),
+            weekdayStyle: const TextStyle(
+              color: Colors.black87, // Default text color for weekdays
             ),
           ),
           headerStyle: HeaderStyle(
             titleCentered: true,
+            titleTextStyle: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
             formatButtonVisible: false,
+            leftChevronIcon: const Icon(Icons.chevron_left, color: Colors.black),
+            rightChevronIcon:
+            const Icon(Icons.chevron_right, color: Colors.black),
           ),
         ),
         const SizedBox(height: 16),
         Expanded(
           child: _tasksForSelectedDay.isNotEmpty
               ? ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _tasksForSelectedDay.length,
-                  itemBuilder: (context, index) {
-                    final task = _tasksForSelectedDay[index];
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                TaskDetailView(taskId: task.id),
-                          ),
-                        );
-                      },
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: task.isCompleted
-                                ? Colors.green
-                                : Theme.of(context).primaryColor,
-                            child: Icon(
-                              task.isCompleted ? Icons.check : Icons.event_note,
-                              color: Colors.white,
-                            ),
-                          ),
-                          title: Text(
-                            task.title,
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                          ),
-                          subtitle: Text(
-                            "Due: ${_formatDate(task.deadline!)}",
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey.shade600,
-                                    ),
-                          ),
-                          trailing: task.isCompleted
-                              ? Icon(Icons.check_circle, color: Colors.green)
-                              : null,
-                        ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _tasksForSelectedDay.length,
+            itemBuilder: (context, index) {
+              final task = _tasksForSelectedDay[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          TaskDetailView(taskId: task.id),
+                    ),
+                  );
+                },
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: task.isCompleted
+                          ? const Color(0xFF34C759) // iOS green
+                          : const Color(0xFF007AFF), // iOS blue
+                      child: Icon(
+                        task.isCompleted ? Icons.check : Icons.event_note,
+                        color: Colors.white,
                       ),
-                    );
-                  },
-                )
-              : Center(
-                  child: Text(
-                    "No tasks for the selected day",
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    title: Text(
+                      task.title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    subtitle: Text(
+                      "Due: ${_formatDate(task.deadline!)}",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    trailing: task.isCompleted
+                        ? const Icon(Icons.check_circle,
+                        color: Color(0xFF34C759)) // iOS green
+                        : null,
                   ),
                 ),
+              );
+            },
+          )
+              : Center(
+            child: Text(
+              "No tasks for the selected day",
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey,
+              ),
+            ),
+          ),
         ),
       ],
     );

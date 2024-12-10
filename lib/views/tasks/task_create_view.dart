@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:developer';
 import 'package:app/models/attachment.dart';
+import 'package:app/providers/task_provider.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/utils/app_colors.dart';
 import 'package:app/utils/app_str.dart';
@@ -23,12 +24,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:app/models/task.dart';
-import 'package:app/providers/task_provider.dart';
+import 'package:app/services/task_firestore_service.dart'; // Import Firestore service
 import 'package:uuid/uuid.dart';
 
 class TaskCreateView extends StatefulWidget {
   final Task? task;
-  final ResearchService researchService; // Add researchService dependency
+  final ResearchService researchService;
 
   const TaskCreateView({
     super.key,
@@ -50,21 +51,20 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   List<Attachment> attachments = [];
   int lastValidPoints = 0;
   bool isRepeating = false;
-  String? repeatInterval; // E.g., "daily", "weekly", etc.
-  int? customRepeatDays; // For custom intervals
-  DateTime? nextOccurrence; // Next occurrence of the repeating task
-  String? alertFrequency = "5_minutes"; // Default valid value
+  String? repeatInterval;
+  int? customRepeatDays;
+  DateTime? nextOccurrence;
+  String? alertFrequency = "5_minutes";
   int? customReminderQuantity;
   String? customReminderUnit;
   Map<String, dynamic>? customReminder = {"unit": "hours", "quantity": 1};
 
-  // Add state variables
-  String? selectedCategory = "General"; // Default category
+  String? selectedCategory = "General";
   List<String> researchKeywords = [];
   String? suggestedPaper;
   String? suggestedPaperUrl;
 
-  // Generate Keywords from Task Title and Description
+  // Generates keywords from task title and description
   void generateResearchKeywords() {
     final title = titleTaskController.text.trim();
     final description = descriptionTaskController.text.trim();
@@ -82,7 +82,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
-  // Add Keyword
+  // Adds a new keyword to researchKeywords
   void addKeyword(String keyword) {
     setState(() {
       if (!researchKeywords.contains(keyword)) {
@@ -91,21 +91,19 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     });
   }
 
-  // Remove Keyword
+  // Removes a keyword from researchKeywords
   void removeKeyword(String keyword) {
     setState(() {
       researchKeywords.remove(keyword);
     });
   }
 
+  // Generates keywords by splitting the title and description into unique words
   List<String> generateKeywords(String title, String description) {
-    // Example: Simple keyword extraction (replace with real logic or API)
     final allText = "$title $description".toLowerCase();
-    final words =
-        allText.split(RegExp(r'\s+')).toSet(); // Split into unique words
-    final keywords =
-        words.where((word) => word.length > 3).toList(); // Filter short words
-    return keywords.take(5).toList(); // Return the top 5 keywords
+    final words = allText.split(RegExp(r'\s+')).toSet();
+    final keywords = words.where((word) => word.length > 3).toList();
+    return keywords.take(5).toList();
   }
 
   @override
@@ -122,7 +120,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       suggestedPaper = widget.task!.suggestedPaper;
       suggestedPaperUrl = widget.task!.suggestedPaperUrl;
 
-      // Initialize custom reminder variables if they exist
       if (widget.task!.customReminder != null) {
         customReminderQuantity = widget.task!.customReminder!['quantity'];
         customReminderUnit = widget.task!.customReminder!['unit'];
@@ -136,19 +133,37 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.grey.shade50, // Subtle light background
         appBar: const TaskViewAppBar(),
         body: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Top Section
               _buildTopSideTexts(textTheme),
-              const SizedBox(height: 16),
-              Expanded(child: _buildMainTaskViewActivity(textTheme, context)),
-              const SizedBox(height: 16),
-              _buildAttachmentsSection(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 2),
+
+              // Main Task View Section
+              Expanded(
+                child: SingleChildScrollView(
+                  physics:
+                      const BouncingScrollPhysics(), // Smooth scroll effect
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMainTaskViewActivity(textTheme, context),
+                      const SizedBox(height: 8),
+                      _buildAttachmentsSection(),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Section
+              const Divider(
+                  thickness: 1.5, color: Colors.grey), // Subtle divider
+              const SizedBox(height: 8),
               _buildBottomSideButtons(),
             ],
           ),
@@ -157,6 +172,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Bottom buttons for saving/updating or deleting tasks
   Widget _buildBottomSideButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -180,12 +196,15 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Save or update the task to Firestore
   void _saveOrUpdateTask() async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
 
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         (selectedDeadline != null || flexibleDeadline != null)) {
+      final taskFirestoreService =
+          TaskFirestoreService(); // Use Firestore service
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
       // Validate alert frequency
@@ -199,6 +218,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
         return;
       }
+
       final customReminderConfig =
           (alertFrequency == "custom") ? customReminder : null;
 
@@ -209,18 +229,19 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       final DateTime? deadline = selectedDeadline;
       final String? flexibleDeadlineOption = flexibleDeadline;
 
+      // Check if it's a new task or an update
       if (widget.task == null) {
         // Creating a new task
         final newTask = Task(
           id: const Uuid().v4(),
           title: titleTaskController.text,
           description: descriptionTaskController.text,
-          category: category, // Save selected category
-          keywords: keywords, // Save keywords
+          category: category,
+          keywords: keywords,
           deadline: deadline,
           flexibleDeadline: flexibleDeadlineOption,
-          alertFrequency: alertFrequency, // Save alert frequency
-          customReminder: customReminderConfig, // Save custom reminder
+          alertFrequency: alertFrequency,
+          customReminder: customReminderConfig,
           isRepeating: isRepeating,
           repeatInterval: repeatInterval,
           customRepeatDays: customRepeatDays,
@@ -230,6 +251,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
 
         try {
+          // Add task to Firestore
           taskProvider.addTask(newTask);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task added successfully!")),
@@ -296,13 +318,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         }
       }
     } else {
-      // Validation error
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
     }
   }
 
+  // Show options to update repeating tasks
   Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
     await showDialog(
@@ -310,9 +332,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       builder: (context) {
         return AlertDialog(
           title: const Text("Update Repeating Task"),
-          content: const Text(
-            "How would you like to update this repeating task?",
-          ),
+          content:
+              const Text("How would you like to update this repeating task?"),
           actions: [
             TextButton(
               onPressed: () {
@@ -328,8 +349,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   customRepeatDays: customRepeatDays,
                 );
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("Update All"),
             ),
@@ -347,8 +368,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   customRepeatDays: customRepeatDays,
                 );
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("This and Following"),
             ),
@@ -366,8 +387,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
                   customRepeatDays: customRepeatDays,
                 );
                 _resetFields();
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Exit to previous view
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               child: const Text("Only This"),
             ),
@@ -377,11 +398,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  /// Reset fields after adding/updating a task
+  // Reset all fields after adding or updating a task
   void _resetFields() {
     titleTaskController.clear();
     descriptionTaskController.clear();
-    pointsController.clear;
+    pointsController.clear();
     setState(() {
       selectedDeadline = null;
       attachments.clear();
@@ -393,7 +414,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     });
   }
 
-  /// Calculate the next occurrence based on repeat settings
+  // Calculate next occurrence based on repeat settings
   DateTime? _calculateNextOccurrence() {
     if (!isRepeating) return null;
 
@@ -416,11 +437,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return null;
   }
 
-  void _deleteTask() {
+  // Delete the task from Firestore
+  void _deleteTask() async {
     if (widget.task != null) {
       try {
-        Provider.of<TaskProvider>(context, listen: false)
-            .removeTask(widget.task!);
+        final taskFirestoreService = TaskFirestoreService();
+        await taskFirestoreService.deleteTask(widget.task!.id);
         Navigator.of(context)
             .pop(MaterialPageRoute(builder: (context) => const HomeView()));
       } catch (e) {
@@ -432,6 +454,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Build a button with specified properties
   Widget _buildButton({
     required String label,
     IconData? icon,
@@ -440,7 +463,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }) {
     return SizedBox(
       width: 150,
-      height: 55,
+      height: 40,
       child: MaterialButton(
         onPressed: onPressed,
         color: color,
@@ -465,27 +488,99 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Main UI components and layout for creating or updating tasks
   Widget _buildMainTaskViewActivity(TextTheme textTheme, BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 8.0, left: 20),
+            padding: const EdgeInsets.only(bottom: 2.0, left: 100),
             child: Text(AppStr.titleOfTitleTextField,
                 style: textTheme.headlineMedium),
           ),
-          RepTextField(
-            controller: titleTaskController,
-            hintText: AppStr.placeholderTitle,
+
+          Center(
+            child: SizedBox(
+              width: 335, // Adjust horizontal size
+              height: 50, // Adjust vertical size
+              child: TextField(
+                controller: titleTaskController,
+                maxLines: 1, // Single-line input
+                textAlignVertical:
+                    TextAlignVertical.center, // Aligns text to the center
+                decoration: InputDecoration(
+                  labelText: AppStr.placeholderTitle, // Floating label
+                  floatingLabelBehavior: FloatingLabelBehavior
+                      .auto, // Enables floating label animation
+                  hintText: '', // No hint text to keep the box as blank
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), // Rounded edges
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade400,
+                      width: 1.5,
+                    ), // Light grey border
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade600,
+                      width: 2,
+                    ), // Slightly darker grey on focus
+                  ),
+                  labelStyle: TextStyle(
+                      color: Colors.grey.shade600), // Label text style
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16), // Padding for better alignment
+                ),
+                style: const TextStyle(color: Colors.black), // Black text color
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          RepTextField(
-            controller: descriptionTaskController,
-            isForDescription: true,
-            hintText: AppStr.placeholderDescription,
+
+          const SizedBox(height: 10),
+          Center(
+            child: SizedBox(
+              width: 335, // Adjust horizontal size
+              height: 100, // Adjust vertical size
+              child: TextField(
+                controller: descriptionTaskController,
+                maxLines: null, // Allows for multiline input
+                expands: true, // Expands to fill the height of the SizedBox
+                textAlignVertical:
+                    TextAlignVertical.top, // Aligns text to the top-left
+                decoration: InputDecoration(
+                  labelText: AppStr.placeholderDescription, // Floating label
+                  floatingLabelBehavior: FloatingLabelBehavior
+                      .auto, // Enables floating label animation
+                  hintText: '', // No hint text to keep the box empty
+                  hintStyle:
+                      TextStyle(color: Colors.grey.shade400), // Hint text style
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), // Rounded edges
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade400,
+                      width: 1.5,
+                    ), // Light grey border
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: Colors.grey.shade600,
+                      width: 2,
+                    ), // Slightly darker grey on focus
+                  ),
+                  labelStyle: TextStyle(
+                      color: Colors.grey.shade600), // Label text style
+                  contentPadding:
+                      const EdgeInsets.all(16), // Adds padding inside the box
+                ),
+                style: const TextStyle(color: Colors.black), // Black text color
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -536,22 +631,22 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               setState(() {
                 flexibleDeadline = value;
                 if (value != "Specific Deadline") {
-                  selectedDeadline = null; // Reset specific deadline
+                  selectedDeadline = null;
                 }
               });
             },
             onSpecificDeadlineSelected: (date) {
               setState(() {
-                selectedDeadline = date; // Update the specific deadline
+                selectedDeadline = date;
               });
             },
           ),
           if (flexibleDeadline == "Specific Deadline") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.toLocal()}".split(' ')[0]
-                  : AppStr.selectDate, // Use AppStr for "Select Date"
+                  : AppStr.selectDate,
               onTap: () {
                 DatePicker.showDatePicker(context, onConfirm: (date) {
                   setState(() {
@@ -570,7 +665,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             DateTimeSelectionWidget(
               title: selectedDeadline != null
                   ? "${selectedDeadline!.hour}:${selectedDeadline!.minute.toString().padLeft(2, '0')}"
-                  : AppStr.selectDate, // Use AppStr for "Select Date"
+                  : AppStr.selectDate,
               onTap: () {
                 DatePicker.showTimePicker(context, onConfirm: (time) {
                   setState(() {
@@ -590,15 +685,15 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           _buildRepeatingToggle(textTheme),
           if (isRepeating) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildRepeatIntervalDropdown(textTheme),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _buildCustomIntervalInput(textTheme),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           AlertFrequencyDropdown(
             alertFrequency: alertFrequency,
             onFrequencyChanged: (value) {
@@ -613,7 +708,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             },
           ),
           if (alertFrequency == "custom") ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             CustomReminderInput(
               customReminder: customReminder,
               onCustomReminderChanged: (value) {
@@ -623,7 +718,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
           // Category Dropdown
           CategoryDropdown(
@@ -632,12 +727,12 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               setState(() {
                 selectedCategory = value;
                 if (selectedCategory != "Research") {
-                  researchKeywords.clear(); // Reset keywords
+                  researchKeywords.clear();
                 }
               });
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
           // Conditionally show Research Section
           if (selectedCategory == "Research") ...[
@@ -690,13 +785,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Header text section with title for the task form
   Widget _buildTopSideTexts(TextTheme textTheme) {
-    // Determine if it's an add or update action
     final titleText =
         widget.task == null ? AppStr.addNewTask : AppStr.updateCurrentTask;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -705,7 +800,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               titleText,
-              style: textTheme.headlineLarge?.copyWith(
+              style: textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
               ),
@@ -718,6 +813,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the attachment section where users can add files or links
   Widget _buildAttachmentsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -750,6 +846,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the repeat interval dropdown for recurring tasks
   Widget _buildRepeatIntervalDropdown(TextTheme textTheme) {
     if (!isRepeating) return const SizedBox.shrink();
 
@@ -758,12 +855,13 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       onChanged: (value) {
         setState(() {
           repeatInterval = value;
-          if (value != "custom") customRepeatDays = null; // Reset custom days
+          if (value != "custom") customRepeatDays = null;
         });
       },
     );
   }
 
+  // Build the repeating toggle for toggling the repeating task feature
   Widget _buildRepeatingToggle(TextTheme textTheme) {
     return RepeatingToggle(
       isRepeating: isRepeating,
@@ -780,6 +878,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Build the custom interval input for setting custom repeat intervals
   Widget _buildCustomIntervalInput(TextTheme textTheme) {
     if (!isRepeating || repeatInterval != "custom")
       return const SizedBox.shrink();
@@ -794,7 +893,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
-  // Individual attachment tile with delete option
+  // Build each individual attachment tile with a delete option
   Widget _buildAttachmentTile(Attachment attachment) {
     return ListTile(
       leading: Icon(_getAttachmentIcon(attachment.type)),
@@ -806,6 +905,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Get the correct icon based on the attachment type
   IconData _getAttachmentIcon(AttachmentType type) {
     switch (type) {
       case AttachmentType.file:
@@ -819,6 +919,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Pick a file using file picker
   void _pickFile() async {
     final result = await FilePicker.platform.pickFiles();
     if (result != null) {
@@ -833,6 +934,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     }
   }
 
+  // Prompt for adding a URL link as an attachment
   void _promptForLink() {
     showDialog(
       context: context,
@@ -870,6 +972,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     );
   }
 
+  // Remove an attachment from the list
   void _removeAttachment(String attachmentId) {
     setState(() {
       attachments.removeWhere((a) => a.id == attachmentId);
