@@ -1,4 +1,5 @@
 import 'package:app/models/subtask.dart';
+import 'package:app/providers/task_provider.dart';
 import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/services/task_firestore_service.dart'; // Add Firestore service import
@@ -20,6 +21,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 class TaskDetailView extends StatelessWidget {
   final String taskId;
+
   /// Fetch human-readable details for createdBy, assignedTo, and projectId
   /// Fetch user and project details using Firestore.
   /// Logs and returns the 'name' fields for createdBy, assignedTo, and projectId.
@@ -27,8 +29,8 @@ class TaskDetailView extends StatelessWidget {
       String createdBy, String? assignedTo, String? projectId) async {
     final firestore = FirebaseFirestore.instance; // Firestore instance
     final Map<String, String> details = {
-      'createdBy': 'Unknown',          // Default for createdBy
-      'assignedTo': 'Not Assigned',    // Default for assignedTo
+      'createdBy': 'Unknown', // Default for createdBy
+      'assignedTo': 'Not Assigned', // Default for assignedTo
       'projectName': 'Non-project related', // Default for project
     };
 
@@ -36,14 +38,16 @@ class TaskDetailView extends StatelessWidget {
       // Fetch 'createdBy' user name from 'users' collection
       print("Fetching createdBy user with ID: $createdBy");
       if (createdBy.isNotEmpty) {
-        final createdByDoc = await firestore.collection('users').doc(createdBy).get();
+        final createdByDoc =
+            await firestore.collection('users').doc(createdBy).get();
         if (createdByDoc.exists) {
           final createdByName = createdByDoc.data()?['name'];
           if (createdByName != null && createdByName is String) {
             details['createdBy'] = createdByName;
             print("Created By: $createdByName");
           } else {
-            print("Warning: 'name' field is missing or not a String in user document: $createdBy");
+            print(
+                "Warning: 'name' field is missing or not a String in user document: $createdBy");
           }
         } else {
           print("Warning: No user document found for createdBy ID: $createdBy");
@@ -55,24 +59,28 @@ class TaskDetailView extends StatelessWidget {
       // Fetch 'assignedTo' user name (optional)
       if (assignedTo != null && assignedTo.isNotEmpty) {
         print("Fetching assignedTo user with ID: $assignedTo");
-        final assignedToDoc = await firestore.collection('users').doc(assignedTo).get();
+        final assignedToDoc =
+            await firestore.collection('users').doc(assignedTo).get();
         if (assignedToDoc.exists && assignedToDoc.data()?['name'] != null) {
           details['assignedTo'] = assignedToDoc['name'];
           print("Assigned To: ${assignedToDoc['name']}");
         } else {
-          print("Warning: assignedTo user with ID $assignedTo does not exist or has no 'name'.");
+          print(
+              "Warning: assignedTo user with ID $assignedTo does not exist or has no 'name'.");
         }
       }
 
       // Fetch 'projectName' from 'projects' collection
       if (projectId != null && projectId.isNotEmpty) {
         print("Fetching project with ID: $projectId");
-        final projectDoc = await firestore.collection('projects').doc(projectId).get();
+        final projectDoc =
+            await firestore.collection('projects').doc(projectId).get();
         if (projectDoc.exists && projectDoc.data()?['name'] != null) {
           details['projectName'] = projectDoc['name'];
           print("Project Name: ${projectDoc['name']}");
         } else {
-          print("Warning: project with ID $projectId does not exist or has no 'name'.");
+          print(
+              "Warning: project with ID $projectId does not exist or has no 'name'.");
         }
       }
     } catch (e) {
@@ -83,14 +91,12 @@ class TaskDetailView extends StatelessWidget {
     return details;
   }
 
-
-
-
   const TaskDetailView({super.key, required this.taskId});
 
   @override
   Widget build(BuildContext context) {
-    TaskFirestoreService taskFirestoreService = Provider.of<TaskFirestoreService>(context);
+    TaskFirestoreService taskFirestoreService =
+        Provider.of<TaskFirestoreService>(context);
 
     return FutureBuilder<Task>(
       future: taskFirestoreService.getTaskById(taskId),
@@ -100,13 +106,16 @@ class TaskDetailView extends StatelessWidget {
         } else if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         } else if (!snapshot.hasData || snapshot.data == null) {
-          return Center(child: Text('Task not found'));  // Update for 'taskNotFound'
+          return Center(
+              child: Text('Task not found')); // Update for 'taskNotFound'
         }
 
         final task = snapshot.data!;
 
-        final formattedDeadline = DateFormat.yMMMd().add_jm().format(task.deadline!.toLocal());
-        final formattedCreationDate = DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
+        final formattedDeadline =
+            DateFormat.yMMMd().add_jm().format(task.deadline!.toLocal());
+        final formattedCreationDate =
+            DateFormat.yMMMd().add_jm().format(task.creationDate.toLocal());
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -126,7 +135,8 @@ class TaskDetailView extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (context) => TaskCreateView(
                         task: task,
-                        researchService: Provider.of<ResearchService>(context, listen: false),
+                        researchService: Provider.of<ResearchService>(context,
+                            listen: false),
                       ),
                     ),
                   );
@@ -144,8 +154,8 @@ class TaskDetailView extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: ListView(
               children: [
-                _buildTaskDetailsCard(
-                    context, task, formattedDeadline, formattedCreationDate, taskFirestoreService),
+                _buildTaskDetailsCard(context, task, formattedDeadline,
+                    formattedCreationDate, taskFirestoreService),
                 const SizedBox(height: 20),
                 _buildAiFeedbackSection(context, task),
                 const SizedBox(height: 20),
@@ -157,7 +167,8 @@ class TaskDetailView extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -186,7 +197,8 @@ class TaskDetailView extends StatelessWidget {
       String formattedCreationDate,
       TaskFirestoreService taskFirestoreService) {
     return FutureBuilder<Map<String, String>>(
-      future: _fetchUserDetails(task.createdBy, task.assignedTo, task.projectId),
+      future:
+          _fetchUserDetails(task.createdBy, task.assignedTo, task.projectId),
       builder: (context, snapshot) {
         final userDetails = snapshot.data ?? {};
         final createdByName = userDetails['createdBy'] ?? "Unknown";
@@ -204,21 +216,30 @@ class TaskDetailView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow("Task Description", task.description),
+                _buildDetailRow("Description", task.description),
                 _buildDetailRow("Deadline", formattedDeadline),
                 _buildDetailRow("Creation Date", formattedCreationDate),
                 _buildDetailRow("Created By", createdByName),
                 _buildDetailRow("Assigned To", assignedToName),
                 _buildDetailRow("Project", projectName),
-                if (projectName == "Non-project related")
+                _buildDetailRow("Reward Points", '${task.points} pts'),
+                _buildDetailRow("Category", '${task.category}'),
+                _buildTaskResearchSection(
+                    context, task, projectName, taskFirestoreService),
+                if (projectName == "Non-project related") ...[
+                  const SizedBox(height: 10),
+                  const Divider(),
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Text(
                       "Note: This task is not associated with any project.",
-                      style: TextStyle(color: Colors.red.shade700, fontStyle: FontStyle.italic),
+                      style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontStyle: FontStyle.italic),
                     ),
                   ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
+                ]
               ],
             ),
           ),
@@ -252,6 +273,164 @@ class TaskDetailView extends StatelessWidget {
     );
   }
 
+  Widget _buildTaskResearchSection(BuildContext context, Task task,
+      String projectName, TaskFirestoreService taskFirestoreService) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Keywords section for Research category
+        if (task.category == "Research") ...[
+          const SizedBox(height: 10),
+          const Divider(),
+          Text(
+            'Keywords:',
+            style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          if (task.keywords.isNotEmpty)
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children: task.keywords
+                  .map((keyword) => Chip(
+                        label: Text(keyword),
+                        backgroundColor:
+                            AppColors.primaryColor.withOpacity(0.1),
+                        labelStyle:
+                            const TextStyle(color: AppColors.primaryColor),
+                      ))
+                  .toList(),
+            )
+          else
+            Text(
+              'No Keywords available',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          const SizedBox(height: 10),
+        ],
+
+        // Suggested Paper section for Research category
+        if (task.category == "Research") ...[
+          Text(
+            'Suggested Paper:',
+            style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          if (task.suggestedPaper != null &&
+              task.suggestedPaperUrl != null &&
+              task.suggestedPaper != "No title available" &&
+              task.suggestedPaperUrl != "No DOI available") ...[
+            InkWell(
+              onTap: () async {
+                final url = Uri.parse(task.suggestedPaperUrl!);
+                await launchUrl(url);
+              },
+              child: Text(
+                task.suggestedPaper!,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: AppColors.primaryColor,
+                      decoration: TextDecoration.underline,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween, // Space out buttons evenly
+              children: [
+                // Button: Add Suggested Paper as Subtask
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.add_task,
+                        size: 18), // Smaller icon size
+                    label: const Text(
+                      "Add as Subtask",
+                      style: TextStyle(fontSize: 12), // Smaller text size
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8), // Smaller padding
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      final subTask = SubTask(
+                        title: task.suggestedPaper!,
+                        description: "Suggested research paper",
+                        status: SubtaskStatus.pending, // Default status
+                        author: task.suggestedPaperAuthor,
+                        publishDate: task.suggestedPaperPublishDate != null
+                            ? DateTime.parse(task.suggestedPaperPublishDate!)
+                            : null,
+                        url: task.suggestedPaperUrl,
+                      );
+
+                      taskFirestoreService.addSubTask(task.id, subTask);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text("Suggested paper added as a subtask!")),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10), // Space between buttons
+                // Button: Refresh Suggested Paper
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.refresh,
+                        size: 18), // Smaller icon size
+                    label: const Text(
+                      "Refresh Paper",
+                      style: TextStyle(fontSize: 12), // Smaller text size
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      foregroundColor: AppColors.primaryColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8), // Smaller padding
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () async {
+                      try {
+                        await taskFirestoreService
+                            .refreshSuggestedPaper(task.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("Suggested paper refreshed!")),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text("Error refreshing suggested paper: $e")),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ] else
+            Text(
+              task.suggestedPaper ?? 'No Suggested Paper available',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+        ],
+      ],
+    );
+  }
 
   // Helper Method for displaying AI feedback
   Widget _buildAiFeedbackSection(BuildContext context, Task task) {
@@ -285,11 +464,11 @@ class TaskDetailView extends StatelessWidget {
           final feedback = snapshot.data!;
           return AIFeedbackWidget(
             feedbackMessage:
-            feedback['message'] ?? "No motivational message available",
+                feedback['message'] ?? "No motivational message available",
             recommendation:
-            feedback['recommendation'] ?? "No recommendation available",
+                feedback['recommendation'] ?? "No recommendation available",
             onRefresh: () async {
-              await fetchAIFeedback(context, task);  // Re-fetch AI feedback
+              await fetchAIFeedback(context, task); // Re-fetch AI feedback
             },
           );
         }
@@ -302,8 +481,8 @@ class TaskDetailView extends StatelessWidget {
   }
 
   // Helper Method for displaying attachments section
-  Widget _buildAttachmentsSection(
-      BuildContext context, Task task, TaskFirestoreService taskFirestoreService) {
+  Widget _buildAttachmentsSection(BuildContext context, Task task,
+      TaskFirestoreService taskFirestoreService) {
     return Card(
       color: Colors.white,
       elevation: 4,
@@ -318,9 +497,9 @@ class TaskDetailView extends StatelessWidget {
             Text(
               AppStr.attachmentsLabel,
               style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                color: AppColors.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 10),
             ElevatedButton.icon(
@@ -355,7 +534,8 @@ class TaskDetailView extends StatelessWidget {
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
-                        taskFirestoreService.removeAttachment(task.id, attachment.id);  // Use Firestore
+                        taskFirestoreService.removeAttachment(
+                            task.id, attachment.id); // Use Firestore
                       },
                     ),
                     onTap: () => _openAttachment(attachment),
@@ -381,13 +561,15 @@ class TaskDetailView extends StatelessWidget {
         type: AttachmentType.file,
       );
 
-      taskFirestoreService.addAttachment(taskId, newAttachment);  // Add to Firestore
+      taskFirestoreService.addAttachment(
+          taskId, newAttachment); // Add to Firestore
     }
   }
 
   // Show delete options dialog for repeating tasks
   Future<void> showDeleteOptionsDialog(BuildContext context, Task task) async {
-    final taskFirestoreService = Provider.of<TaskFirestoreService>(context, listen: false);
+    final taskFirestoreService =
+        Provider.of<TaskFirestoreService>(context, listen: false);
 
     if (task.isRepeating) {
       // Show delete options dialog for repeating tasks
@@ -400,21 +582,24 @@ class TaskDetailView extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () {
-                  taskFirestoreService.deleteRepeatingTasks(task, option: "all");
+                  taskFirestoreService.deleteRepeatingTasks(task,
+                      option: "all");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteAllButton),
               ),
               TextButton(
                 onPressed: () {
-                  taskFirestoreService.deleteRepeatingTasks(task, option: "this_and_following");
+                  taskFirestoreService.deleteRepeatingTasks(task,
+                      option: "this_and_following");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteThisAndFollowingButton),
               ),
               TextButton(
                 onPressed: () {
-                  taskFirestoreService.deleteRepeatingTasks(task, option: "only_this");
+                  taskFirestoreService.deleteRepeatingTasks(task,
+                      option: "only_this");
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.deleteOnlyThisButton),
@@ -438,7 +623,8 @@ class TaskDetailView extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  taskFirestoreService.removeTask(task.id);  // Correct, passing task ID as a String
+                  taskFirestoreService.removeTask(
+                      task.id); // Correct, passing task ID as a String
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 child: const Text(AppStr.yesButton),
@@ -451,7 +637,8 @@ class TaskDetailView extends StatelessWidget {
   }
 
   // Helper function to fetch AI feedback
-  Future<Map<String, String>> fetchAIFeedback(BuildContext context, Task task) async {
+  Future<Map<String, String>> fetchAIFeedback(
+      BuildContext context, Task task) async {
     final openAIService = Provider.of<OpenAIService>(context, listen: false);
 
     try {
