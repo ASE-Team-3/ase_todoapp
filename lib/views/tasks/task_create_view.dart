@@ -61,7 +61,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   String? customReminderUnit;
   Map<String, dynamic>? customReminder = {"unit": "hours", "quantity": 1};
   String? selectedProjectId; // Holds the selected project ID from the dropdown
-  String? selectedAssignedToUserId; // Holds the selected user ID to assign the task
+  String?
+      selectedAssignedToUserId; // Holds the selected user ID to assign the task
   String? selectedCategory = "General";
   List<String> researchKeywords = [];
   String? suggestedPaper;
@@ -69,8 +70,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   String? selectedProject; // Holds selected project ID
   String? selectedAssignee; // Holds selected assignee ID
   String? assignedToUserId; // For storing the selected user ID
-  List<Map<String, String>> userProjects = []; // List of projects created by the user
-  List<Map<String, String>> projectMembers = []; // List of members assigned to the selected project
+  List<Map<String, String>> userProjects =
+      []; // List of projects created by the user
+  List<Map<String, String>> projectMembers =
+      []; // List of members assigned to the selected project
 
   // Generates keywords from task title and description
   void generateResearchKeywords() {
@@ -114,8 +117,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     return keywords.take(5).toList();
   }
 
- @override
- void initState() {
+  @override
+  void initState() {
     super.initState();
     _fetchUserProjects(); // Fetch user-created projects when the page loads
 
@@ -172,7 +175,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           .get();
 
       if (projectDoc.exists) {
-        final List<String> memberIds = List<String>.from(projectDoc['members'] ?? []);
+        final List<String> memberIds =
+            List<String>.from(projectDoc['members'] ?? []);
         if (memberIds.isNotEmpty) {
           final snapshot = await FirebaseFirestore.instance
               .collection('users')
@@ -196,7 +200,6 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       log("Error fetching project members: $e");
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -277,7 +280,8 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     if (currentUser == null || currentUser.uid == null) {
       log("Error: No user is logged in.");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must be logged in to create or update a task.")),
+        const SnackBar(
+            content: Text("You must be logged in to create or update a task.")),
       );
       return;
     }
@@ -332,8 +336,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           points: enteredPoints,
           createdBy: currentUser.uid, // Add createdBy field
           assignedBy: currentUser.uid, // Assigned by the current user
-          projectId: selectedProjectId?.isNotEmpty == true ? selectedProjectId : null,
-          assignedTo: assignedToUserId?.isNotEmpty == true ? assignedToUserId : null,
+          projectId:
+              selectedProjectId?.isNotEmpty == true ? selectedProjectId : null,
+          assignedTo:
+              assignedToUserId?.isNotEmpty == true ? assignedToUserId : null,
         );
 
         try {
@@ -716,52 +722,92 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
           // Project Dropdown (Select Project)
           DropdownButtonFormField<String>(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: "Select Project", // Label for the project dropdown
               border: OutlineInputBorder(),
+              filled: true, // Enable fill color
+              fillColor: Colors.white, // White background color
             ),
             value: selectedProjectId, // Currently selected project ID
-            items: userProjects.map((project) {
-              return DropdownMenuItem<String>(
-                value: project['id'], // Internal value (Project ID)
-                child: Text(project['name'] ?? 'Unnamed Project'), // Project Name with fallback
-              );
-            }).toList(),
+            items: [
+              // Default "Select Project" option with null value
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text(
+                  "Select Project", // Placeholder text
+                  style: TextStyle(color: Colors.black), // Optional styling
+                ),
+              ),
+              // List of user projects
+              ...userProjects.map((project) {
+                return DropdownMenuItem<String>(
+                  value: project['id'], // Internal value (Project ID)
+                  child: Text(
+                    project['name'] ?? 'Unnamed Project',
+                    style: TextStyle(color: Colors.black),
+                  ), // Project Name with fallback
+                );
+              }).toList(),
+            ],
             onChanged: (value) {
               setState(() {
                 selectedProjectId = value; // Store selected project ID
-                assignedToUserId = null;   // Reset Assignee selection when project changes
+                assignedToUserId =
+                    null; // Reset Assignee selection when project changes
                 if (value != null) {
-                  _fetchProjectMembers(value); // Fetch members if a valid project is selected
+                  _fetchProjectMembers(
+                      value); // Fetch members if a valid project is selected
                 }
               });
             },
+            dropdownColor: Colors.white, // Dropdown list background color
+            style: const TextStyle(
+                color: Colors.black), // Text color of the dropdown
           ),
 
           const SizedBox(height: 16), // Add spacing
 
           // Assignee Dropdown (Select Member, based on selected project)
-          if (selectedProjectId != null) // Show this dropdown only if a project is selected
+          if (selectedProjectId !=
+              null) // Show this dropdown only if a project is selected
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: "Assign Task To", // Label for the assignee dropdown
                 border: OutlineInputBorder(),
+                filled: true, // Enable fill color
+                fillColor: Colors.white, // White background color
               ),
               value: assignedToUserId, // Currently selected member ID
-              items: projectMembers.map((member) {
-                return DropdownMenuItem<String>(
-                  value: member['id'], // Internal value (User ID)
-                  child: Text(member['name'] ?? 'Unknown User'), // Member Name with fallback
-                );
-              }).toList(),
+              items: [
+                // Default option to indicate no selection
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text(
+                    "Select Member",
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+                // List of project members
+                ...projectMembers.map((member) {
+                  return DropdownMenuItem<String>(
+                    value: member['id'], // Internal value (User ID)
+                    child: Text(
+                      member['name'] ??
+                          'Unknown User', // Member Name with fallback
+                      style: TextStyle(color: Colors.black),
+                    ),
+                  );
+                }).toList(),
+              ],
               onChanged: (value) {
                 setState(() {
                   assignedToUserId = value; // Store the selected member ID
                 });
               },
+              dropdownColor: Colors.white, // Dropdown list background color
+              style: const TextStyle(
+                  color: Colors.black), // Text color of the dropdown
             ),
-
-
 
           FlexibleDeadlineDropdown(
             flexibleDeadline: flexibleDeadline,
