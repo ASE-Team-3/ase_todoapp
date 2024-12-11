@@ -98,8 +98,8 @@ class TaskDetailView extends StatelessWidget {
     TaskFirestoreService taskFirestoreService =
         Provider.of<TaskFirestoreService>(context);
 
-    return FutureBuilder<Task>(
-      future: taskFirestoreService.getTaskById(taskId),
+    return StreamBuilder<Task>(
+      stream: taskFirestoreService.getTaskWithSubtasks(taskId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -403,8 +403,9 @@ class TaskDetailView extends StatelessWidget {
                     ),
                     onPressed: () async {
                       try {
-                        await taskFirestoreService
-                            .refreshSuggestedPaper(task.id);
+                        final taskProvider =
+                            Provider.of<TaskProvider>(context, listen: false);
+                        await taskProvider.refreshSuggestedPaper(task.id);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text("Suggested paper refreshed!")),

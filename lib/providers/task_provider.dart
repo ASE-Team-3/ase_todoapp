@@ -58,17 +58,17 @@ class TaskProvider extends ChangeNotifier {
   /// Returns:
   /// - A `List<Task>` where all `DateTime` fields are converted to local time.
   List<Task> Function() get tasks => () {
-    return _tasks.map((task) {
-      return task.copyWith(
-        creationDate: convertUtcToLocal(task.creationDate),
-        deadline: convertUtcToLocal(task.deadline),
-        nextOccurrence: convertUtcToLocal(task.nextOccurrence),
-        createdBy: task.createdBy, // Preserve the original `createdBy`
-        assignedBy: task.assignedBy, // Preserve the original `assignedBy`
-        assignedTo: task.assignedTo, // Preserve the original `assignedTo`
-      );
-    }).toList();
-  };
+        return _tasks.map((task) {
+          return task.copyWith(
+            creationDate: convertUtcToLocal(task.creationDate),
+            deadline: convertUtcToLocal(task.deadline),
+            nextOccurrence: convertUtcToLocal(task.nextOccurrence),
+            createdBy: task.createdBy, // Preserve the original `createdBy`
+            assignedBy: task.assignedBy, // Preserve the original `assignedBy`
+            assignedTo: task.assignedTo, // Preserve the original `assignedTo`
+          );
+        }).toList();
+      };
 
   /// Loads tasks from Firestore and updates the local task list.
   void loadTasks() {
@@ -175,6 +175,7 @@ class TaskProvider extends ChangeNotifier {
         suggestedPaperPublishDate: newPaper['publishDate'],
         suggestedPaperUrl: newPaper['url'],
       );
+      notifyListeners();
     } catch (e) {
       throw Exception("Failed to refresh suggested paper: $e");
     }

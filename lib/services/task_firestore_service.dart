@@ -37,7 +37,8 @@ class TaskFirestoreService {
               .collection('subtasks') // Nested subtasks collection
               .get();
 
-          print("Debug: Found ${subTasksSnapshot.docs.length} subtasks for Task ID: $taskId");
+          print(
+              "Debug: Found ${subTasksSnapshot.docs.length} subtasks for Task ID: $taskId");
 
           // Map subtasks data
           final subtasks = subTasksSnapshot.docs.map((subDoc) {
@@ -45,10 +46,12 @@ class TaskFirestoreService {
           }).toList();
 
           // Combine task and its subtasks
-          final task = Task.fromMap(taskData, taskId).copyWith(subTasks: subtasks);
+          final task =
+              Task.fromMap(taskData, taskId).copyWith(subTasks: subtasks);
           tasks.add(task);
 
-          print("Debug: Task '$taskId' enriched with ${subtasks.length} subtasks.");
+          print(
+              "Debug: Task '$taskId' enriched with ${subtasks.length} subtasks.");
         } catch (e, stackTrace) {
           print("Error: Failed to fetch subtasks for Task ID: ${doc.id}");
           print("Error Details: $e");
@@ -56,7 +59,8 @@ class TaskFirestoreService {
         }
       }
 
-      print("Debug: Completed fetching tasks with subtasks. Total: ${tasks.length}");
+      print(
+          "Debug: Completed fetching tasks with subtasks. Total: ${tasks.length}");
       return tasks;
     });
   }
@@ -74,7 +78,8 @@ class TaskFirestoreService {
 
     return _db
         .collection('tasks') // Firestore tasks collection
-        .where('createdBy', isEqualTo: currentUserId) // Filter tasks created by user
+        .where('createdBy',
+            isEqualTo: currentUserId) // Filter tasks created by user
         .snapshots()
         .asyncMap((snapshot) async {
       List<Task> tasks = [];
@@ -98,7 +103,8 @@ class TaskFirestoreService {
           }).toList();
 
           // Combine task and its subtasks
-          final task = Task.fromMap(taskData, taskId).copyWith(subTasks: subtasks);
+          final task =
+              Task.fromMap(taskData, taskId).copyWith(subTasks: subtasks);
           tasks.add(task);
 
           log("Task '$taskId' enriched with ${subtasks.length} subtasks.");
@@ -111,7 +117,6 @@ class TaskFirestoreService {
       return tasks;
     });
   }
-
 
   // Add a task to Firestore
   Future<void> addTask(Task task) async {
@@ -200,6 +205,35 @@ class TaskFirestoreService {
     }
   }
 
+  /// Retrieves a Task along with its Subtasks as a Stream
+  Stream<Task> getTaskWithSubtasks(String taskId) {
+    return _db
+        .collection(collectionPath)
+        .doc(taskId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      if (snapshot.exists) {
+        final taskData = snapshot.data() as Map<String, dynamic>;
+
+        // Fetch subtasks for this task
+        final subTasksSnapshot = await _db
+            .collection(collectionPath)
+            .doc(taskId)
+            .collection('subtasks')
+            .get();
+
+        final subtasks = subTasksSnapshot.docs
+            .map((subDoc) => SubTask.fromMap(subDoc.data()))
+            .toList();
+
+        // Return Task with its Subtasks
+        return Task.fromMap(taskData, snapshot.id).copyWith(subTasks: subtasks);
+      } else {
+        throw Exception("Task not found");
+      }
+    });
+  }
+
   // Update an existing task in Firestore
   Future<void> updateTask(Task task) async {
     try {
@@ -251,27 +285,6 @@ class TaskFirestoreService {
       print("Stack Trace: $stackTrace");
 
       // Step 6: Rethrow the error for further handling
-      rethrow;
-    }
-  }
-
-  // Refresh the suggested paper for a task
-  Future<void> refreshSuggestedPaper(String taskId) async {
-    try {
-      final taskRef = _db.collection(collectionPath).doc(taskId);
-      final taskDoc = await taskRef.get();
-      if (taskDoc.exists) {
-        final taskData = taskDoc.data()!;
-        final suggestedPaper = taskData['suggestedPaper'];
-        final suggestedPaperUrl = taskData['suggestedPaperUrl'];
-
-        // Simulate refreshing the suggested paper (e.g., by calling an API)
-        print("Suggested paper refreshed: $suggestedPaperUrl");
-      } else {
-        print("Task not found while refreshing suggested paper.");
-      }
-    } catch (e) {
-      print("Error refreshing suggested paper: $e");
       rethrow;
     }
   }
