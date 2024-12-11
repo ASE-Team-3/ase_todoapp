@@ -39,16 +39,23 @@ class _ProjectViewState extends State<ProjectView> {
     }
 
     try {
-      final snapshot = await _db
+
+      // Fetch projects where the user is assigned (arrayContains)
+      final assignedProjects = await _db
           .collection('projects')
-          .where('createdBy', isEqualTo: currentUser.uid)
+          .where('members', arrayContains: currentUser.uid) // Corrected to 'members'
           .get();
 
+      // Combine both project lists and avoid duplicates
+      final allProjects = {
+        ...assignedProjects.docs,
+      };
+
       setState(() {
-        userProjects = snapshot.docs.map((doc) {
+        userProjects = allProjects.map((doc) {
           return {
-            'id': doc.id.toString(), // Ensure ID is a String
-            'name': (doc['name'] ?? 'Unnamed Project').toString(), // Safely cast name to String
+            'id': doc.id.toString(),
+            'name': (doc['name'] ?? 'Unnamed Project').toString(),
           };
         }).toList();
       });
@@ -58,6 +65,7 @@ class _ProjectViewState extends State<ProjectView> {
       print("Error fetching user projects: $e");
     }
   }
+
 
   /// Fetch tasks under the selected project and categorize them
   Future<void> _getTasksForProject(String projectId) async {

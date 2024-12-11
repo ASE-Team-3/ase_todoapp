@@ -316,7 +316,7 @@ class TaskProvider extends ChangeNotifier {
 
     final DateTime now = DateTime.now().toUtc();
     final DateTime defaultLimit =
-        now.add(const Duration(days: 730)); // Default: 2 years
+        now.add(const Duration(days: 183)); // Default: 2 years
     final DateTime generationLimit = limit ?? defaultLimit;
 
     DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
@@ -330,7 +330,7 @@ class TaskProvider extends ChangeNotifier {
         nextOccurrence: null, // Only the original task has `nextOccurrence`
       );
 
-      _tasks.add(newTask);
+      _taskService.addTask(newTask);
 
       // Calculate the next occurrence
       nextOccurrence = _calculateNextOccurrence(
