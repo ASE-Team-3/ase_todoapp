@@ -302,6 +302,22 @@ class TaskFirestoreService {
     });
   }
 
+  Stream<SubTask> getSubTaskById(String taskId, String subTaskId) {
+    return _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('subtasks')
+        .doc(subTaskId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists) {
+        return SubTask.fromMap(snapshot.data()!);
+      } else {
+        throw Exception("Subtask not found");
+      }
+    });
+  }
+
   // Toggle task completion status
   Future<void> toggleTaskCompletion(Task task) async {
     try {
@@ -433,6 +449,25 @@ class TaskFirestoreService {
       print("Error updating subtask status: $e");
       rethrow;
     }
+  }
+
+  // Stream to fetch real-time updates for SubTask items
+  Stream<List<SubTaskItem>> getSubTaskItems(String taskId, String subTaskId) {
+    return _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('subtasks')
+        .doc(subTaskId)
+        .snapshots()
+        .map((snapshot) {
+      final subTaskData = snapshot.data();
+      if (subTaskData != null && subTaskData['items'] != null) {
+        final items = List<Map<String, dynamic>>.from(subTaskData['items']);
+        return items.map((item) => SubTaskItem.fromMap(item)).toList();
+      } else {
+        return [];
+      }
+    });
   }
 
   // Add a subtask item to a subtask

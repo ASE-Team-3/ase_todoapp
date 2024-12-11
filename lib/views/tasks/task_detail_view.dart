@@ -365,6 +365,7 @@ class TaskDetailView extends StatelessWidget {
                         title: task.suggestedPaper!,
                         description: "Suggested research paper",
                         status: SubtaskStatus.pending, // Default status
+                        type: SubTaskType.paper,
                         author: task.suggestedPaperAuthor,
                         publishDate: task.suggestedPaperPublishDate != null
                             ? DateTime.parse(task.suggestedPaperPublishDate!)
