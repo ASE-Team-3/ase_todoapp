@@ -1,9 +1,8 @@
 import 'package:app/utils/app_colors.dart';
+import 'package:app/views/tasks/subtasks/subtask_detail_view.dart';
 import 'package:app/views/tasks/widget/add_subtask_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:app/providers/task_provider.dart';
-import 'package:app/views/tasks/subtasks/subtask_detail_view.dart';
 import 'package:app/models/subtask.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app/models/task.dart';
@@ -16,86 +15,64 @@ class SubtaskView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Task>(
-      future: Provider.of<TaskFirestoreService>(context, listen: false).getTaskById(taskId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    final taskService =
+        Provider.of<TaskFirestoreService>(context, listen: false);
+
+    return StreamBuilder<Task>(
+      stream: taskService
+          .getTaskWithSubtasks(taskId), // Watch task with subtasks in real-time
+      builder: (context, taskSnapshot) {
+        if (taskSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
+        } else if (taskSnapshot.hasError) {
           return Scaffold(
             backgroundColor: Colors.white,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Subtasks',
-                style: TextStyle(color: Colors.black),
-              ),
-              iconTheme: const IconThemeData(color: Colors.black),
-            ),
+            appBar: _buildAppBar('Subtasks'),
             body: const Center(child: Text('Error loading task')),
           );
-        } else if (snapshot.hasData) {
-          final task = snapshot.data!;
-          return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              title: Text(
-                '${task.title} - Subtasks',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black),
-              ),
-              iconTheme: const IconThemeData(color: Colors.black),
-              elevation: 0,
-            ),
-            body: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (task.subTasks.isNotEmpty)
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: task.subTasks.length,
-                        itemBuilder: (context, index) {
-                          final subTask = task.subTasks[index];
-                          return _buildSubTaskCard(context, task, subTask);
-                        },
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
-                        ),
-                        builder: (context) => Padding(
-                          padding: EdgeInsets.only(
-                            bottom: MediaQuery.of(context).viewInsets.bottom,
+        } else if (taskSnapshot.hasData && taskSnapshot.data != null) {
+          final task = taskSnapshot.data!;
+
+          // Listen to the subtasks collection
+          return StreamBuilder<List<SubTask>>(
+            stream:
+                taskService.getSubTasks(taskId), // Subtasks collection stream
+            builder: (context, subtaskSnapshot) {
+              final List<SubTask> subTasks = subtaskSnapshot.data ??
+                  task.subTasks; // Fallback to task.subTasks if stream fails
+
+              return Scaffold(
+                backgroundColor: Colors.white,
+                appBar: _buildAppBar('${task.title} - Subtasks'),
+                body: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (subTasks.isNotEmpty)
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: subTasks.length,
+                            itemBuilder: (context, index) {
+                              final subTask = subTasks[index];
+                              return _buildSubTaskCard(context, task, subTask);
+                            },
                           ),
-                          child: AddSubTaskWidget(taskId: taskId),
+                        )
+                      else
+                        const Center(
+                          child: Text(
+                            "No Subtasks available. Add one below!",
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('Add Subtask', style: TextStyle(fontSize: 16)),
+                      const SizedBox(height: 20),
+                      _buildAddSubtaskButton(context),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         } else {
           return const Center(child: Text('Task not found'));
@@ -104,6 +81,52 @@ class SubtaskView extends StatelessWidget {
     );
   }
 
+  /// Builds the app bar with a given title
+  AppBar _buildAppBar(String title) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      title: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.black),
+      ),
+      iconTheme: const IconThemeData(color: Colors.black),
+      elevation: 0,
+    );
+  }
+
+  /// Builds the Add Subtask button
+  Widget _buildAddSubtaskButton(BuildContext context) {
+    return ElevatedButton(
+      onPressed: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (context) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: AddSubTaskWidget(taskId: taskId),
+          ),
+        );
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      child: const Text('Add Subtask', style: TextStyle(fontSize: 16)),
+    );
+  }
+
+  /// Builds each subtask card
   Widget _buildSubTaskCard(BuildContext context, Task task, SubTask subTask) {
     return Card(
       color: Colors.white,
@@ -124,24 +147,7 @@ class SubtaskView extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Check for specific subtask status and display accordingly
-            if (subTask.status == SubtaskStatus.pending) ...[
-              Text(
-                'Status: Pending',
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ] else if (subTask.status == SubtaskStatus.inProgress) ...[
-              Text(
-                'Status: In Progress',
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ] else if (subTask.status == SubtaskStatus.completed) ...[
-              Text(
-                'Status: Completed',
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ],
-            // Handle other subtask details
+            _buildSubTaskStatus(subTask),
             if (subTask.author != null)
               Text('Author: ${subTask.author!}',
                   style: const TextStyle(color: Colors.black54)),
@@ -178,7 +184,10 @@ class SubtaskView extends StatelessWidget {
               value: subTask.status == SubtaskStatus.completed,
               onChanged: (value) {
                 context.read<TaskFirestoreService>().updateSubTaskStatus(
-                    task.id, subTask.id, SubtaskStatus.completed);
+                      task.id,
+                      subTask.id,
+                      value! ? SubtaskStatus.completed : SubtaskStatus.pending,
+                    );
               },
               activeColor: AppColors.primaryColor,
             ),
@@ -205,7 +214,26 @@ class SubtaskView extends StatelessWidget {
     );
   }
 
-  void _confirmDeleteSubTask(BuildContext context, Task task, String subTaskId) {
+  /// Builds the subtask status text
+  Widget _buildSubTaskStatus(SubTask subTask) {
+    switch (subTask.status) {
+      case SubtaskStatus.pending:
+        return const Text('Status: Pending',
+            style: TextStyle(color: Colors.black54));
+      case SubtaskStatus.inProgress:
+        return const Text('Status: In Progress',
+            style: TextStyle(color: Colors.black54));
+      case SubtaskStatus.completed:
+        return const Text('Status: Completed',
+            style: TextStyle(color: Colors.green));
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  /// Confirms and deletes a subtask
+  void _confirmDeleteSubTask(
+      BuildContext context, Task task, String subTaskId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -219,7 +247,9 @@ class SubtaskView extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                context.read<TaskFirestoreService>().removeSubTask(task.id, subTaskId);
+                context
+                    .read<TaskFirestoreService>()
+                    .removeSubTask(task.id, subTaskId);
                 Navigator.pop(context);
               },
               child: const Text('Delete', style: TextStyle(color: Colors.red)),

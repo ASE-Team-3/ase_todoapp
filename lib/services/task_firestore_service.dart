@@ -289,6 +289,19 @@ class TaskFirestoreService {
     }
   }
 
+  Stream<List<SubTask>> getSubTasks(String taskId) {
+    return _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('subtasks')
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return SubTask.fromMap(doc.data() as Map<String, dynamic>);
+      }).toList();
+    });
+  }
+
   // Toggle task completion status
   Future<void> toggleTaskCompletion(Task task) async {
     try {
