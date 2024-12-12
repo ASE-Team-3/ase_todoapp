@@ -64,18 +64,6 @@ class _HomeAppBarState extends State<HomeAppBar>
                 ),
               ),
             ),
-            // Trash Icon
-            Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: IconButton(
-                  onPressed: () {
-                    // TODO: REMOVE ALL THE TASK FROM THE DB WITH THIS BUTTON ON PRESS
-                  },
-                  icon: const Icon(
-                    CupertinoIcons.trash_fill,
-                    size: 40,
-                  )),
-            )
           ],
         ),
       ),
