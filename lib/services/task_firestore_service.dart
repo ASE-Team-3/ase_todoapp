@@ -385,41 +385,83 @@ class TaskFirestoreService {
     }
   }
 
-  // Method to delete repeating tasks
   Future<void> deleteRepeatingTasks(Task task, {required String option}) async {
     try {
-      final taskRef = _db.collection(collectionPath).doc(task.id);
+      WriteBatch batch = _db.batch(); // Create a Firestore batch
 
-      if (option == "all") {
-        // Delete all repeating tasks
-        await taskRef.collection('repeatingTasks').get().then((querySnapshot) {
-          for (var doc in querySnapshot.docs) {
-            doc.reference.delete();
-          }
-        });
-        print("All repeating tasks deleted for task ${task.id}");
-      } else if (option == "this_and_following") {
-        // Delete the current task and following repeating tasks
-        await taskRef
-            .collection('repeatingTasks')
-            .where('taskId', isEqualTo: task.id)
-            .get()
-            .then((querySnapshot) {
-          for (var doc in querySnapshot.docs) {
-            doc.reference.delete();
-          }
-        });
-        print(
-            "Current and following repeating tasks deleted for task ${task.id}");
-      } else if (option == "only_this") {
-        // Delete only the current repeating task
-        await taskRef.collection('repeatingTasks').doc(task.id).delete();
-        print("Only the current repeating task deleted for task ${task.id}");
+      switch (option) {
+        case "all":
+          await _deleteTasksByGroupId(task.repeatingGroupId, batch);
+          break;
+        case "this_and_following":
+          await _deleteThisAndFollowingTasks(task, batch);
+          break;
+        case "only_this":
+          await _deleteOnlyThisTask(task, batch);
+          break;
+        default:
+          log('Unknown delete option: $option');
       }
-    } catch (e) {
-      print("Error deleting repeating tasks: $e");
-      rethrow; // Propagate the error to be handled by the caller
+
+      await batch.commit(); // Commit all operations atomically
+      log('Batch delete operation completed successfully.');
+    } catch (e, stackTrace) {
+      log('Error performing batch deletion: $e');
+      log(stackTrace.toString());
+      rethrow;
     }
+  }
+
+  // Helper method: Batch delete tasks by groupId
+  Future<void> _deleteTasksByGroupId(
+      String? repeatingGroupId, WriteBatch batch) async {
+    if (repeatingGroupId == null) {
+      log('Task does not have a repeatingGroupId');
+      return;
+    }
+
+    final querySnapshot = await _db
+        .collection(collectionPath)
+        .where('repeatingGroupId', isEqualTo: repeatingGroupId)
+        .get();
+
+    for (var doc in querySnapshot.docs) {
+      batch.delete(doc.reference); // Add each delete operation to the batch
+    }
+
+    log('Added ${querySnapshot.docs.length} tasks to batch for groupId: $repeatingGroupId');
+  }
+
+  // Helper method: Batch delete this task and all subsequent tasks
+  Future<void> _deleteThisAndFollowingTasks(Task task, WriteBatch batch) async {
+    if (task.repeatingGroupId == null || task.deadline == null) {
+      log('Task does not have a repeatingGroupId or deadline: ${task.title}');
+      return;
+    }
+
+    try {
+      // Query tasks with the same repeatingGroupId and deadline >= current task
+      final querySnapshot = await _db
+          .collection(collectionPath)
+          .where('repeatingGroupId', isEqualTo: task.repeatingGroupId)
+          .where('deadline', isGreaterThanOrEqualTo: task.deadline)
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        batch.delete(doc.reference); // Add each delete operation to the batch
+      }
+      log("Batch deletion prepared for ${querySnapshot.docs.length} tasks.");
+    } catch (e) {
+      log("Error fetching tasks for batch deletion: $e");
+      rethrow; // Rethrow the exception to handle it upstream
+    }
+  }
+
+  // Helper method: Batch delete only this specific task
+  Future<void> _deleteOnlyThisTask(Task task, WriteBatch batch) async {
+    final taskRef = _db.collection(collectionPath).doc(task.id);
+    batch.delete(taskRef); // Add delete operation to the batch
+    log('Added task ${task.title} to batch for deletion.');
   }
 
 // Remove a subtask from a task
