@@ -571,12 +571,10 @@ class TaskFirestoreService {
   }
 
   /// Toggle Subtask Completion: Ensures items rules are followed.
+  /// If all subtasks of a task are completed, the task itself is marked as completed.
   Future<void> toggleSubTaskCompletion(String taskId, SubTask subTask) async {
-    final subTaskRef = _db
-        .collection('tasks')
-        .doc(taskId)
-        .collection('subtasks')
-        .doc(subTask.id);
+    final taskRef = _db.collection('tasks').doc(taskId);
+    final subTaskRef = taskRef.collection('subtasks').doc(subTask.id);
 
     try {
       // Step 1: Check if subtask has items
@@ -594,13 +592,43 @@ class TaskFirestoreService {
       }
 
       if (canMarkCompleted) {
-        // Step 3: Toggle Subtask Completion
+        // Step 3: Log before updating subtask status
+        print(
+            'Attempting to update subtask: ${subTask.title} - Task ID: $taskId');
         final isNowCompleted = !subTask.isCompleted;
 
-        // Step 4: Update subtask status in Firestore
-        await subTaskRef.update({'isCompleted': isNowCompleted});
+        // Step 4: Update the subtask status in Firestore
+        await subTaskRef
+            .update({'isCompleted': isNowCompleted}).catchError((e) {
+          print('Error updating subtask status: $e');
+          throw e; // Rethrow error for logging
+        });
+        print('Subtask "${subTask.title}" status updated to: $isNowCompleted');
 
-        print('Subtask "${subTask.title}" updated successfully.');
+        // Step 5: Fetch all subtasks to verify completion
+        print('Fetching all subtasks for Task ID: $taskId');
+        final subTasksSnapshot = await taskRef.collection('subtasks').get();
+
+        for (var doc in subTasksSnapshot.docs) {
+          final subTaskData = doc.data();
+          print(
+              'Subtask ID: ${doc.id}, Title: ${subTaskData['title']}, isCompleted: ${subTaskData['isCompleted']}');
+        }
+
+        // Step 6: Check if all subtasks are completed
+        final allSubTasksCompleted = subTasksSnapshot.docs.every((doc) {
+          final subTaskData = doc.data();
+          return subTaskData['isCompleted'] == true;
+        });
+
+        // Step 7: Update the parent task's completion status if applicable
+        if (allSubTasksCompleted) {
+          await taskRef.update({'isCompleted': true});
+          print('All subtasks are completed. Task marked as completed.');
+        } else {
+          await taskRef.update({'isCompleted': false});
+          print('Some subtasks are incomplete. Task remains incomplete.');
+        }
       } else {
         print(
             'Cannot mark subtask as completed. Some items are still incomplete.');
@@ -949,23 +977,60 @@ class TaskFirestoreService {
     }
   }
 
-  // Toggle the completion status of a subtask item
+  /// Toggle the completion status of a subtask item
   Future<void> toggleSubTaskItemCompletion(
       String taskId, String subTaskId, String itemId) async {
     try {
       final taskRef = _db.collection(collectionPath).doc(taskId);
       final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
+
+      // Step 1: Fetch the current subtask data
       final subTaskDoc = await subTaskRef.get();
+      if (!subTaskDoc.exists) {
+        throw Exception("Subtask not found");
+      }
+
       final subTaskData = subTaskDoc.data()!;
       final items = List<Map<String, dynamic>>.from(subTaskData['items']);
       final itemIndex = items.indexWhere((item) => item['id'] == itemId);
 
-      if (itemIndex != -1) {
-        final item = items[itemIndex];
-        item['isCompleted'] = !item['isCompleted']; // Toggle completion status
+      if (itemIndex == -1) {
+        throw Exception("Item not found in subtask");
+      }
 
-        await subTaskRef.update({'items': items});
-        print("Subtask item completion status toggled for Item ID: $itemId");
+      // Step 2: Toggle the item's completion status
+      final item = items[itemIndex];
+      item['isCompleted'] = !(item['isCompleted'] ?? false);
+      items[itemIndex] = item;
+
+      // Step 3: Check if all items are completed
+      final allItemsCompleted =
+          items.every((element) => element['isCompleted'] == true);
+
+      // Step 4: Update the subtask's completion status
+      final isSubTaskCompleted = allItemsCompleted;
+
+      await subTaskRef.update({
+        'items': items,
+        'isCompleted': isSubTaskCompleted,
+      });
+
+      print(
+          "Subtask item completion status toggled for Item ID: $itemId. Subtask completion status: $isSubTaskCompleted");
+
+      // Step 5: Check if all subtasks under the task are completed
+      if (isSubTaskCompleted) {
+        final subTasksSnapshot =
+            await taskRef.collection('subtasks').get(); // Fetch all subtasks
+        final allSubTasksCompleted = subTasksSnapshot.docs.every((subDoc) {
+          final subData = subDoc.data();
+          return subData['isCompleted'] == true;
+        });
+
+        if (allSubTasksCompleted) {
+          await taskRef.update({'isCompleted': true});
+          print("All subtasks are completed. Task marked as completed.");
+        }
       }
     } catch (e) {
       print("Error toggling subtask item completion: $e");

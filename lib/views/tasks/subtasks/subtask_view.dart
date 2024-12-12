@@ -181,13 +181,22 @@ class SubtaskView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Checkbox(
-              value: subTask.status == SubtaskStatus.completed,
-              onChanged: (value) {
-                context.read<TaskFirestoreService>().updateSubTaskStatus(
-                      task.id,
-                      subTask.id,
-                      value! ? SubtaskStatus.completed : SubtaskStatus.pending,
-                    );
+              value: subTask.isCompleted,
+              onChanged: (value) async {
+                try {
+                  await context
+                      .read<TaskFirestoreService>()
+                      .toggleSubTaskCompletion(task.id, subTask);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(
+                            'Subtask "${subTask.title}" updated successfully')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
+                  );
+                }
               },
               activeColor: AppColors.primaryColor,
             ),
