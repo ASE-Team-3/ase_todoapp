@@ -1,11 +1,13 @@
 import 'dart:developer';
 
+import 'package:app/helpers/task_helpers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
 
 class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -126,6 +128,60 @@ class TaskFirestoreService {
     } catch (e) {
       print("Error adding task to Firestore: $e");
       rethrow;
+    }
+  }
+
+  // Updated _generateRepeatingTasks to use batch writes and accept a limit parameter
+  Future<void> generateRepeatingTasks(Task task, String? groupId,
+      {DateTime? limit}) async {
+    if (!task.isRepeating || task.repeatInterval == null) return;
+
+    final WriteBatch batch =
+        FirebaseFirestore.instance.batch(); // Create a batch
+    final String collectionPath = 'tasks';
+
+    final DateTime now = DateTime.now().toUtc();
+    final DateTime defaultLimit =
+        now.add(const Duration(days: 183)); // Default limit: ~6 months
+    final DateTime generationLimit = limit ?? defaultLimit;
+
+    DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
+    int tasksAdded = 0;
+
+    while (nextOccurrence != null && nextOccurrence.isBefore(generationLimit)) {
+      // Generate a unique ID for the new task
+      final String newTaskId = const Uuid().v4();
+
+      // Create a new task for each occurrence
+      final newTask = task.copyWith(
+        id: newTaskId,
+        isCompleted: false, // Reset completion status
+        deadline: nextOccurrence,
+        repeatingGroupId: groupId, // Maintain consistent group ID
+        nextOccurrence: null, // Only the original task has `nextOccurrence`
+      );
+
+      // Add the task to the batch
+      final DocumentReference newTaskRef =
+          FirebaseFirestore.instance.collection(collectionPath).doc(newTaskId);
+      batch.set(newTaskRef, newTask.toMap());
+
+      // Calculate the next occurrence
+      nextOccurrence = calculateNextOccurrence(
+        interval: task.repeatInterval,
+        customDays: task.customRepeatDays,
+        lastOccurrence: nextOccurrence,
+      ).toUtc();
+
+      tasksAdded++;
+    }
+
+    // Commit the batch operation
+    if (tasksAdded > 0) {
+      await batch.commit();
+      log('Successfully added $tasksAdded repeating tasks for: ${task.title}');
+    } else {
+      log('No new tasks were generated for: ${task.title}');
     }
   }
 

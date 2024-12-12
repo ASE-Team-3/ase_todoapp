@@ -116,7 +116,7 @@ class TaskProvider extends ChangeNotifier {
     if (task.isRepeating) {
       final repeatingGroupId = const Uuid().v4();
       final taskWithGroupId = task.copyWith(repeatingGroupId: repeatingGroupId);
-      _generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
+      _taskService.generateRepeatingTasks(taskWithGroupId, repeatingGroupId);
     } else {
       // Add single instance task to the list
       await _taskService.addTask(task);
@@ -260,7 +260,8 @@ class TaskProvider extends ChangeNotifier {
 
     // Regenerate repeating tasks if needed
     if (updatedTask.isRepeating) {
-      _generateRepeatingTasks(updatedTask, updatedTask.repeatingGroupId);
+      _taskService.generateRepeatingTasks(
+          updatedTask, updatedTask.repeatingGroupId);
     }
 
     // Find the task index and update it
@@ -308,39 +309,6 @@ class TaskProvider extends ChangeNotifier {
     }
 
     return task;
-  }
-
-  // Updated _generateRepeatingTasks to accept a limit parameter
-  void _generateRepeatingTasks(Task task, String? groupId, {DateTime? limit}) {
-    if (!task.isRepeating || task.repeatInterval == null) return;
-
-    final DateTime now = DateTime.now().toUtc();
-    final DateTime defaultLimit =
-        now.add(const Duration(days: 183)); // Default: 2 years
-    final DateTime generationLimit = limit ?? defaultLimit;
-
-    DateTime? nextOccurrence = task.deadline ?? task.nextOccurrence;
-    while (nextOccurrence != null && nextOccurrence.isBefore(generationLimit)) {
-      // Create a new task for each occurrence with its unique deadline
-      final newTask = task.copyWith(
-        id: const Uuid().v4(),
-        isCompleted: false, // Reset completion status
-        deadline: nextOccurrence,
-        repeatingGroupId: groupId, // Ensure groupId is consistent
-        nextOccurrence: null, // Only the original task has `nextOccurrence`
-      );
-
-      _taskService.addTask(newTask);
-
-      // Calculate the next occurrence
-      nextOccurrence = _calculateNextOccurrence(
-        interval: task.repeatInterval,
-        customDays: task.customRepeatDays,
-        lastOccurrence: nextOccurrence,
-      ).toUtc();
-    }
-
-    log('Extended repeating tasks for: ${task.title}');
   }
 
   void updateRepeatingTasks(
@@ -447,7 +415,7 @@ class TaskProvider extends ChangeNotifier {
     DateTime nextOccurrence = startDate;
 
     for (int i = 0; i < iteration; i++) {
-      nextOccurrence = _calculateNextOccurrence(
+      nextOccurrence = calculateNextOccurrence(
         interval: interval,
         customDays: customDays,
         lastOccurrence: nextOccurrence,
@@ -465,7 +433,7 @@ class TaskProvider extends ChangeNotifier {
         currentLimit.add(Duration(days: additionalYears * 365));
 
     // Regenerate tasks up to the new limit
-    _generateRepeatingTasks(
+    _taskService.generateRepeatingTasks(
       task.copyWith(deadline: task.deadline), // Use the original deadline
       task.repeatingGroupId, // Ensure repeatingGroupId is preserved
       limit: newLimit, // Pass the new limit for task generation
@@ -477,7 +445,7 @@ class TaskProvider extends ChangeNotifier {
   // Handle overdue tasks by skipping or resetting deadlines
   void handleOverdueTask(Task task, bool skipToNext) {
     if (task.isRepeating && skipToNext) {
-      final DateTime nextDeadline = _calculateNextOccurrence(
+      final DateTime nextDeadline = calculateNextOccurrence(
         interval: task.repeatInterval,
         customDays: task.customRepeatDays,
         lastOccurrence: task.deadline ?? DateTime.now(),
@@ -507,42 +475,6 @@ class TaskProvider extends ChangeNotifier {
     } else {
       log('Task with ID $taskId not found for deadline update.');
     }
-  }
-
-  // Helper to calculate the next occurrence
-  DateTime _calculateNextOccurrence({
-    required String? interval,
-    required int? customDays,
-    required DateTime lastOccurrence,
-  }) {
-    switch (interval) {
-      case "daily":
-        return lastOccurrence.add(const Duration(days: 1));
-      case "weekly":
-        return lastOccurrence.add(const Duration(days: 7));
-      case "monthly":
-        return DateTime(
-          lastOccurrence.year,
-          lastOccurrence.month + 1,
-          lastOccurrence.day,
-          lastOccurrence.hour,
-          lastOccurrence.minute,
-        );
-      case "yearly":
-        return DateTime(
-          lastOccurrence.year + 1,
-          lastOccurrence.month,
-          lastOccurrence.day,
-          lastOccurrence.hour,
-          lastOccurrence.minute,
-        );
-      case "custom":
-        if (customDays != null) {
-          return lastOccurrence.add(Duration(days: customDays));
-        }
-        break;
-    }
-    throw Exception("Invalid repeat interval or custom days");
   }
 
   void toggleTaskCompletion(Task task) {

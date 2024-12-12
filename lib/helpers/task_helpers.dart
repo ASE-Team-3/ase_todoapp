@@ -50,3 +50,39 @@ DateTime? calculateFlexibleDeadline(String? flexibleDeadline) {
       return null;
   }
 }
+
+/// Helper to calculate the next occurrence
+DateTime calculateNextOccurrence({
+  required String? interval,
+  required int? customDays,
+  required DateTime lastOccurrence,
+}) {
+  switch (interval) {
+    case "daily":
+      return lastOccurrence.add(const Duration(days: 1));
+    case "weekly":
+      return lastOccurrence.add(const Duration(days: 7));
+    case "monthly":
+      return DateTime(
+        lastOccurrence.year,
+        lastOccurrence.month + 1,
+        lastOccurrence.day,
+        lastOccurrence.hour,
+        lastOccurrence.minute,
+      );
+    case "yearly":
+      return DateTime(
+        lastOccurrence.year + 1,
+        lastOccurrence.month,
+        lastOccurrence.day,
+        lastOccurrence.hour,
+        lastOccurrence.minute,
+      );
+    case "custom":
+      if (customDays != null) {
+        return lastOccurrence.add(Duration(days: customDays));
+      }
+      break;
+  }
+  throw Exception("Invalid repeat interval or custom days");
+}
