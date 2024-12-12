@@ -5,15 +5,12 @@ import 'package:app/services/notification_service.dart';
 import 'package:app/services/research_service.dart';
 import 'package:app/utils/datetime_utils.dart';
 import 'package:app/utils/deadline_utils.dart';
-import 'package:app/models/points_history_entry.dart';
 import 'package:app/utils/keyword_generator.dart';
-import 'package:app/utils/notification_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
 import 'package:app/models/subtask_item.dart';
 import 'package:app/models/attachment.dart';
-import 'package:app/providers/points_manager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firebase Firestore import
@@ -23,9 +20,6 @@ class TaskProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   final ResearchService _researchService;
   final NotificationService _notificationService;
-  final PointsManager _pointsManager =
-      PointsManager(); // PointsManager instance
-  final NotificationThrottler _notificationThrottler = NotificationThrottler();
   final TaskFirestoreService _taskService =
       TaskFirestoreService(); // Firestore service
 
@@ -37,9 +31,6 @@ class TaskProvider extends ChangeNotifier {
     loadTasks(); // Load tasks from Firestore on initialization
     log('TaskProvider initialized and tasks loaded.');
   }
-
-  List<PointsHistoryEntry> get pointsHistory => _pointsManager.history;
-  int get totalPoints => _pointsManager.totalPoints;
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
 
   /// This function retrieves the list of tasks with their `DateTime` fields
@@ -363,43 +354,6 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  void toggleTaskCompletion(Task task) {
-    final isNowCompleted = !task.isCompleted;
-
-    // Ensure points are valid
-    final points = task.points;
-
-    // Update task immutably
-    final updatedTask = task.copyWith(isCompleted: isNowCompleted);
-
-    // Find the index of the task in the list and replace it immutably
-    final index = _tasks.indexWhere((t) => t.id == task.id);
-    if (index != -1) {
-      _tasks[index] = updatedTask;
-    }
-
-    // Award or deduct points based on completion status
-    if (isNowCompleted) {
-      _pointsManager.awardPoints(
-        points,
-        'Task "${task.title}" completed',
-      );
-      _notificationThrottler.sendThrottledNotification(
-        sendNotification: _notificationService.sendNotification,
-        title: 'Hurrah!',
-        body: 'You completed the task: "${task.title}"!',
-      );
-    } else {
-      _pointsManager.deductPoints(
-        points,
-        'Task "${task.title}" marked as incomplete',
-      );
-      log('Task marked as incomplete: "${task.title}"');
-    }
-
-    notifyListeners(); // Notify listeners about the state change
-  }
-
   Task? getTaskById(String taskId) {
     try {
       return _tasks.firstWhere((task) => task.id == taskId);
@@ -452,14 +406,6 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  // Remove a sub-task from a task
-  void removeSubTask(String taskId, String subTaskId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    task.subTasks.removeWhere((st) => st.id == subTaskId);
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
   void toggleSubTaskCompletion(String taskId, String subTaskId) {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
@@ -479,26 +425,6 @@ class TaskProvider extends ChangeNotifier {
     _taskService.addSubTaskItem(taskId, subTaskId, item);
     // subTask.toggleCompletion();
     // toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void toggleSubTaskItemCompletion(
-      String taskId, String subTaskId, String itemId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    final item = subTask.items.firstWhere((i) => i.id == itemId);
-    item.isCompleted = !item.isCompleted;
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
-    notifyListeners();
-  }
-
-  void removeSubTaskItem(String taskId, String subTaskId, String itemId) {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
-    final subTask = task.subTasks.firstWhere((st) => st.id == subTaskId);
-    subTask.items.removeWhere((i) => i.id == itemId);
-    subTask.toggleCompletion();
-    toggleTaskCompletion(task);
     notifyListeners();
   }
 

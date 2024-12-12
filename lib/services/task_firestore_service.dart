@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:app/helpers/task_helpers.dart';
+import 'package:app/models/points_history.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app/models/task.dart';
 import 'package:app/models/subtask.dart';
@@ -12,6 +13,8 @@ import 'package:uuid/uuid.dart';
 class TaskFirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String collectionPath = 'tasks';
+  final String pointsHistoryCollection = 'points_history';
+
   //final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
 // Fetch tasks for a specific project along with their subtasks
@@ -502,14 +505,246 @@ class TaskFirestoreService {
     });
   }
 
-  // Toggle task completion status
+  /// Toggle Task Completion: Ensures rules for subtasks/items are followed.
   Future<void> toggleTaskCompletion(Task task) async {
+    final taskRef = _db.collection('tasks').doc(task.id);
+    final subTasksRef = taskRef.collection('subtasks');
+
     try {
-      final taskRef = _db.collection(collectionPath).doc(task.id);
-      await taskRef.update({'isCompleted': !task.isCompleted});
-      print("Task completion status toggled for Task ID: ${task.id}");
+      // Step 1: Check if task has subtasks
+      final subTasksSnapshot = await subTasksRef.get();
+      final hasSubTasks = subTasksSnapshot.docs.isNotEmpty;
+
+      bool canMarkCompleted = true;
+
+      if (hasSubTasks) {
+        // Step 2: Check if all subtasks are completed
+        for (var subDoc in subTasksSnapshot.docs) {
+          final subTask = SubTask.fromMap(subDoc.data());
+
+          // If subtask has items, ensure all items are completed
+          if (subTask.items.isNotEmpty) {
+            final allItemsCompleted =
+                subTask.items.every((item) => item.isCompleted);
+
+            if (!allItemsCompleted) {
+              canMarkCompleted = false;
+              break; // Stop checking, subtask items are incomplete
+            }
+          }
+
+          // If subtask itself is incomplete
+          if (!subTask.isCompleted) {
+            canMarkCompleted = false;
+            break; // Stop checking, subtask incomplete
+          }
+        }
+      }
+
+      if (canMarkCompleted) {
+        // Step 3: Toggle Task Completion
+        final isNowCompleted = !task.isCompleted;
+
+        // Step 4: Update task status in Firestore
+        await taskRef.update({'isCompleted': isNowCompleted});
+
+        // Step 5: Record Points History
+        if (isNowCompleted) {
+          await _addPointsHistory(task, task.points,
+              reason: 'Task "${task.title}" completed');
+          print('Task "${task.title}" marked as completed.');
+        } else {
+          await _addPointsHistory(task, -task.points,
+              reason: 'Task "${task.title}" marked as incomplete');
+          print('Task "${task.title}" marked as incomplete.');
+        }
+      } else {
+        print(
+            'Cannot mark task "${task.title}" as completed. Subtasks/items are incomplete.');
+        throw Exception(
+            'Task cannot be marked as completed. Complete all subtasks and their items first.');
+      }
     } catch (e) {
-      print("Error toggling task completion: $e");
+      print('Error toggling task completion for "${task.title}": $e');
+      rethrow;
+    }
+  }
+
+  /// Toggle Subtask Completion: Ensures items rules are followed.
+  Future<void> toggleSubTaskCompletion(String taskId, SubTask subTask) async {
+    final subTaskRef = _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('subtasks')
+        .doc(subTask.id);
+
+    try {
+      // Step 1: Check if subtask has items
+      final hasItems = subTask.items.isNotEmpty;
+      bool canMarkCompleted = true;
+
+      if (hasItems) {
+        // Step 2: Ensure all items are marked as completed
+        for (var item in subTask.items) {
+          if (!item.isCompleted) {
+            canMarkCompleted = false;
+            break; // Stop checking, item incomplete
+          }
+        }
+      }
+
+      if (canMarkCompleted) {
+        // Step 3: Toggle Subtask Completion
+        final isNowCompleted = !subTask.isCompleted;
+
+        // Step 4: Update subtask status in Firestore
+        await subTaskRef.update({'isCompleted': isNowCompleted});
+
+        print('Subtask "${subTask.title}" updated successfully.');
+      } else {
+        print(
+            'Cannot mark subtask as completed. Some items are still incomplete.');
+        throw Exception(
+            'Subtask cannot be marked as completed. Complete all items first.');
+      }
+    } catch (e) {
+      print('Error toggling subtask completion: $e');
+      rethrow;
+    }
+  }
+
+  /// Helper Method: Adds points history record
+  Future<void> _addPointsHistory(Task task, int points,
+      {required String reason}) async {
+    try {
+      final pointsHistoryRef = _db.collection('points_history').doc();
+      await pointsHistoryRef.set({
+        'taskId': task.id,
+        'action': points > 0 ? 'Awarded' : 'Deducted',
+        'points': points.abs(),
+        'reason': reason,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error recording points history: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetch points history from Firestore
+  Stream<List<PointsHistory>> getPointsHistory() {
+    return _db
+        .collection(pointsHistoryCollection)
+        .orderBy('timestamp', descending: true) // Order by latest
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              return PointsHistory.fromMap(doc.data());
+            }).toList());
+  }
+
+  Stream<int> getTotalPoints() {
+    return FirebaseFirestore.instance
+        .collection(
+            pointsHistoryCollection) // Replace with the actual collection path
+        .snapshots()
+        .map((snapshot) {
+      int totalPoints = 0;
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+
+        // Ensure safe access to 'action' and 'points'
+        final action =
+            data['action']?.toString() ?? ''; // Default to empty string
+        final points = data['points'] is int ? data['points'] as int : 0;
+
+        // Accumulate points based on the action
+        if (action == 'Awarded') {
+          totalPoints += points;
+        } else if (action == 'Deducted') {
+          totalPoints -= points;
+        }
+      }
+
+      return totalPoints;
+    });
+  }
+
+  /// Deduct points for tasks not completed before their deadline
+  Future<void> deductPointsForOverdueTasks() async {
+    try {
+      final now = DateTime.now();
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser == null) {
+        log("No logged-in user. Cannot process overdue tasks.");
+        return;
+      }
+
+      final userId = currentUser.uid;
+
+      // Fetch tasks where deadline has passed, is not completed,
+      // and either createdBy or assignedTo matches the current user
+      final querySnapshot = await _db
+          .collection(collectionPath)
+          .where('isCompleted', isEqualTo: false)
+          .where('deadline', isLessThan: now)
+          .where(Filter.or(
+            Filter('createdBy', isEqualTo: userId),
+            Filter('assignedTo', isEqualTo: userId),
+          ))
+          .get();
+
+      WriteBatch batch = _db.batch();
+
+      for (var doc in querySnapshot.docs) {
+        final task = doc.data();
+        final int points = task['points'] ?? 0;
+
+        if (points > 0) {
+          final taskId = doc.id;
+          final taskTitle = task['title'] ?? 'Unnamed Task';
+
+          // Check if this task already has a deduction in points history
+          final existingDeduction = await _db
+              .collection(pointsHistoryCollection)
+              .where('taskId', isEqualTo: taskId)
+              .where('action', isEqualTo: 'Deducted')
+              .get();
+
+          if (existingDeduction.docs.isNotEmpty) {
+            log('Points already deducted for task "$taskTitle". Skipping.');
+            continue; // Skip tasks that already have deductions
+          }
+
+          log('Deducting $points points for overdue task: $taskTitle');
+
+          // Update task status (optional: flag as overdue)
+          batch.update(doc.reference, {'isOverdue': true});
+
+          // Record points deduction in points history
+          final pointsHistoryRef =
+              _db.collection(pointsHistoryCollection).doc();
+          batch.set(pointsHistoryRef, {
+            'action': 'Deducted',
+            'points': points,
+            'reason': 'Task "$taskTitle" not completed before deadline',
+            'timestamp': FieldValue.serverTimestamp(),
+            'taskId': taskId,
+            'userId': userId,
+          });
+        }
+      }
+
+      // Commit batch if there are any updates
+      if (querySnapshot.docs.isNotEmpty) {
+        await batch.commit();
+        log("Overdue tasks processed and points deducted successfully.");
+      } else {
+        log("No overdue tasks found for user $userId.");
+      }
+    } catch (e) {
+      log("Error deducting points for overdue tasks: $e");
       rethrow;
     }
   }

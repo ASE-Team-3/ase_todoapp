@@ -2,7 +2,7 @@ import 'package:app/initialize_timezones.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:app/services/openai_service.dart';
 import 'package:app/services/research_service.dart';
-import 'package:app/services/task_firestore_service.dart';  // Import TaskFirestoreService
+import 'package:app/services/task_firestore_service.dart'; // Import TaskFirestoreService
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app/views/home/home_view.dart';
 import 'package:app/views/home/login_page.dart';
@@ -40,6 +40,12 @@ void main() async {
     apiKey: dotenv.env['SCOPUS_API_KEY'] ?? '',
   );
 
+  // Points Management
+  // Deduct points if the task is overdue
+  final taskService = TaskFirestoreService();
+  taskService
+      .deductPointsForOverdueTasks(); // Run overdue task check on app start
+
   runApp(
     MultiProvider(
       providers: [
@@ -52,7 +58,8 @@ void main() async {
           ),
         ),
         Provider<TaskFirestoreService>(
-          create: (_) => TaskFirestoreService(),  // Provide TaskFirestoreService here
+          create: (_) =>
+              TaskFirestoreService(), // Provide TaskFirestoreService here
         ),
       ],
       child: const MyApp(),
@@ -110,7 +117,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Check if the user is authenticated and set the initial route
-      initialRoute: FirebaseAuth.instance.currentUser == null ? '/login' : '/home',
+      initialRoute:
+          FirebaseAuth.instance.currentUser == null ? '/login' : '/home',
       routes: {
         '/login': (context) => LoginPage(),
         '/register': (context) => RegisterPage(),
