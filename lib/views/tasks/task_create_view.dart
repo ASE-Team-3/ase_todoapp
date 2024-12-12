@@ -125,11 +125,17 @@ class _TaskCreateViewState extends State<TaskCreateView> {
     if (widget.task != null) {
       titleTaskController.text = widget.task!.title;
       descriptionTaskController.text = widget.task!.description;
+      flexibleDeadline = widget.task!.flexibleDeadline;
       selectedDeadline = widget.task!.deadline;
       attachments = List.from(widget.task!.attachments);
       pointsController.text = widget.task!.points.toString();
       lastValidPoints = widget.task!.points;
       researchKeywords = widget.task!.keywords;
+      alertFrequency = widget.task!.alertFrequency;
+      isRepeating = widget.task!.isRepeating;
+      repeatInterval = widget.task!.repeatInterval;
+      customRepeatDays = widget.task!.customRepeatDays;
+      selectedCategory = widget.task!.category;
       suggestedPaper = widget.task!.suggestedPaper;
       suggestedPaperUrl = widget.task!.suggestedPaperUrl;
 
@@ -271,10 +277,16 @@ class _TaskCreateViewState extends State<TaskCreateView> {
   }
 
   // Save or update the task to Firestore
+  // Save or update the task to Firestore
   void _saveOrUpdateTask() async {
+    log("Starting _saveOrUpdateTask...");
+
     // Declare and initialize currentUser
     final currentUser = FirebaseAuth.instance.currentUser;
+    log("Current User ID: ${currentUser?.uid}");
+
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
+    log("Parsed Points: $enteredPoints");
 
     // Validate that a user is logged in
     if (currentUser == null || currentUser.uid == null) {
@@ -286,25 +298,33 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       return;
     }
 
+    // Validate required fields
     if (titleTaskController.text.isNotEmpty &&
         descriptionTaskController.text.isNotEmpty &&
         (selectedDeadline != null || flexibleDeadline != null)) {
+      log("Validation passed: Title, Description, and Deadline are valid.");
+
       final taskFirestoreService =
           TaskFirestoreService(); // Use Firestore service
       final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
-      // Validate alert frequency
+      log("Selected Category: ${selectedCategory ?? "General"}");
+      log("Alert Frequency: $alertFrequency");
+      log("Is Repeating: $isRepeating");
+
+      // Validate custom reminder for 'custom' alert frequency
       if (alertFrequency == "custom" &&
           (customReminder == null ||
               customReminder!['quantity'] == null ||
               customReminder!['unit'] == null)) {
-        log('Invalid custom reminder configuration');
+        log('Error: Invalid custom reminder configuration.');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStr.customReminderErrorMessage)),
         );
         return;
       }
 
+      // Prepare task details
       final customReminderConfig =
           (alertFrequency == "custom") ? customReminder : null;
 
@@ -315,8 +335,11 @@ class _TaskCreateViewState extends State<TaskCreateView> {
       final DateTime? deadline = selectedDeadline;
       final String? flexibleDeadlineOption = flexibleDeadline;
 
+      log("Task Details: Title: ${titleTaskController.text}, Category: $category, Keywords: $keywords");
+
       // Check if it's a new task or an update
       if (widget.task == null) {
+        log("Creating a new task...");
         // Creating a new task
         final newTask = Task(
           id: const Uuid().v4(),
@@ -343,8 +366,10 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         );
 
         try {
-          // Add task to Firestore
+          log("Calling addTask to TaskProvider...");
           taskProvider.addTask(newTask);
+          log("Task successfully added to TaskProvider.");
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Task added successfully!")),
           );
@@ -356,6 +381,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           );
         }
       } else {
+        log("Updating an existing task...");
         // Updating an existing task
         final updatedTask = widget.task!.copyWith(
           title: titleTaskController.text,
@@ -371,16 +397,16 @@ class _TaskCreateViewState extends State<TaskCreateView> {
           customRepeatDays: customRepeatDays,
           attachments: attachments,
           points: enteredPoints,
-          projectId: selectedProjectId, // Selected project ID
-          assignedTo: assignedToUserId, // User the task is assigned to
+          projectId: selectedProjectId,
+          assignedTo: assignedToUserId,
         );
 
         try {
           if (widget.task!.isRepeating) {
-            // Handle repeating task updates
-            _showUpdateOptionsDialog(taskProvider);
+            log("Task is repeating. Showing update options dialog...");
+            await _showUpdateOptionsDialog(taskFirestoreService);
           } else {
-            // Handle normal task updates
+            log("Calling updateTask on TaskProvider for normal task...");
             taskProvider.updateTask(
               widget.task!,
               title: updatedTask.title,
@@ -397,6 +423,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               attachments: updatedTask.attachments,
               points: updatedTask.points,
             );
+            log("Task successfully updated in TaskProvider.");
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -412,14 +439,17 @@ class _TaskCreateViewState extends State<TaskCreateView> {
         }
       }
     } else {
+      log("Error: Validation failed. Missing required fields.");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStr.fillAllFieldsMessage)),
       );
     }
+
+    log("Completed _saveOrUpdateTask.");
   }
 
-  // Show options to update repeating tasks
-  Future<void> _showUpdateOptionsDialog(TaskProvider taskProvider) async {
+  Future<void> _showUpdateOptionsDialog(
+      TaskFirestoreService taskFirestoreService) async {
     final enteredPoints = int.tryParse(pointsController.text) ?? 0;
     await showDialog(
       context: context,
@@ -430,17 +460,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               const Text("How would you like to update this repeating task?"),
           actions: [
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 // Update all repeating tasks
-                taskProvider.updateRepeatingTasks(
+                await taskFirestoreService.updateRepeatingTasks(
                   widget.task!,
                   option: "all",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
-                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
+                  flexibleDeadline: flexibleDeadline,
+                  isRepeating: isRepeating,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
+                  attachments: attachments,
+                  points: enteredPoints,
+                  category: selectedCategory,
+                  keywords: researchKeywords,
+                  alertFrequency: alertFrequency,
+                  customReminder: customReminder,
+                  suggestedPaper: widget.task?.suggestedPaper,
+                  suggestedPaperAuthor: widget.task?.suggestedPaperAuthor,
+                  suggestedPaperPublishDate:
+                      widget.task?.suggestedPaperPublishDate,
+                  suggestedPaperUrl: widget.task?.suggestedPaperUrl,
                 );
                 _resetFields();
                 Navigator.pop(context);
@@ -449,17 +491,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               child: const Text("Update All"),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 // Update this task and all subsequent tasks
-                taskProvider.updateRepeatingTasks(
+                await taskFirestoreService.updateRepeatingTasks(
                   widget.task!,
                   option: "this_and_following",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
-                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
+                  flexibleDeadline: flexibleDeadline,
+                  isRepeating: isRepeating,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
+                  attachments: attachments,
+                  points: enteredPoints,
+                  category: selectedCategory,
+                  keywords: researchKeywords,
+                  alertFrequency: alertFrequency,
+                  customReminder: customReminder,
+                  suggestedPaper: widget.task?.suggestedPaper,
+                  suggestedPaperAuthor: widget.task?.suggestedPaperAuthor,
+                  suggestedPaperPublishDate:
+                      widget.task?.suggestedPaperPublishDate,
+                  suggestedPaperUrl: widget.task?.suggestedPaperUrl,
                 );
                 _resetFields();
                 Navigator.pop(context);
@@ -468,17 +522,29 @@ class _TaskCreateViewState extends State<TaskCreateView> {
               child: const Text("This and Following"),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 // Update only this specific task occurrence
-                taskProvider.updateRepeatingTasks(
+                await taskFirestoreService.updateRepeatingTasks(
                   widget.task!,
                   option: "only_this",
                   title: titleTaskController.text,
                   description: descriptionTaskController.text,
-                  points: enteredPoints,
                   selectedDeadline: selectedDeadline,
+                  flexibleDeadline: flexibleDeadline,
+                  isRepeating: isRepeating,
                   repeatInterval: repeatInterval,
                   customRepeatDays: customRepeatDays,
+                  attachments: attachments,
+                  points: enteredPoints,
+                  category: selectedCategory,
+                  keywords: researchKeywords,
+                  alertFrequency: alertFrequency,
+                  customReminder: customReminder,
+                  suggestedPaper: widget.task?.suggestedPaper,
+                  suggestedPaperAuthor: widget.task?.suggestedPaperAuthor,
+                  suggestedPaperPublishDate:
+                      widget.task?.suggestedPaperPublishDate,
+                  suggestedPaperUrl: widget.task?.suggestedPaperUrl,
                 );
                 _resetFields();
                 Navigator.pop(context);

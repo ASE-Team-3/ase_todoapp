@@ -301,6 +301,134 @@ class TaskFirestoreService {
     }
   }
 
+  Future<void> updateRepeatingTasks(
+    Task task, {
+    required String option, // "all", "this_and_following", "only_this"
+    required String title,
+    required String description,
+    DateTime? selectedDeadline, // New specific deadline
+    String? flexibleDeadline, // New flexible deadline
+    bool? isRepeating,
+    String? repeatInterval,
+    int? customRepeatDays,
+    List<Attachment>? attachments,
+    int? points,
+    String? category, // Add category
+    List<String>? keywords, // Add keywords
+    String? alertFrequency,
+    Map<String, dynamic>? customReminder,
+    String? suggestedPaper,
+    String? suggestedPaperAuthor,
+    String? suggestedPaperPublishDate,
+    String? suggestedPaperUrl,
+  }) async {
+    final WriteBatch batch = _db.batch();
+    final String collectionPath = 'tasks';
+
+    final groupId = task.repeatingGroupId;
+    if (groupId == null) {
+      log("Task does not have a repeatingGroupId");
+      return;
+    }
+
+    final DateTime? utcSelectedDeadline = selectedDeadline?.toUtc();
+
+    // "All" option: Update all tasks with the same groupId
+    if (option == "all") {
+      final querySnapshot = await _db
+          .collection(collectionPath)
+          .where('repeatingGroupId', isEqualTo: groupId)
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        final taskRef = doc.reference;
+        batch.update(taskRef, {
+          'title': title,
+          'description': description,
+          'points': points,
+          'category': category,
+          'keywords': keywords,
+          'attachments': attachments?.map((a) => a.toMap()).toList(),
+          'deadline': utcSelectedDeadline ??
+              calculateNextOccurrence(
+                interval: repeatInterval ?? task.repeatInterval,
+                customDays: customRepeatDays ?? task.customRepeatDays,
+                lastOccurrence: (doc['deadline'] as Timestamp).toDate(),
+              ),
+          'repeatInterval': repeatInterval ?? task.repeatInterval,
+          'customRepeatDays': customRepeatDays,
+          'flexibleDeadline': flexibleDeadline,
+          'alertFrequency': alertFrequency,
+          'customReminder': customReminder,
+          'suggestedPaper': suggestedPaper,
+          'suggestedPaperAuthor': suggestedPaperAuthor,
+          'suggestedPaperPublishDate': suggestedPaperPublishDate,
+          'suggestedPaperUrl': suggestedPaperUrl,
+        });
+      }
+    }
+    // "This and following" option: Update current and subsequent tasks
+    else if (option == "this_and_following") {
+      final querySnapshot = await _db
+          .collection(collectionPath)
+          .where('repeatingGroupId', isEqualTo: groupId)
+          .where('deadline', isGreaterThanOrEqualTo: task.deadline)
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        final taskRef = doc.reference;
+        batch.update(taskRef, {
+          'title': title,
+          'description': description,
+          'points': points,
+          'category': category,
+          'keywords': keywords,
+          'attachments': attachments?.map((a) => a.toMap()).toList(),
+          'deadline': calculateNextOccurrence(
+            interval: repeatInterval ?? task.repeatInterval,
+            customDays: customRepeatDays ?? task.customRepeatDays,
+            lastOccurrence: (doc['deadline'] as Timestamp).toDate(),
+          ),
+          'repeatInterval': repeatInterval ?? task.repeatInterval,
+          'customRepeatDays': customRepeatDays,
+          'flexibleDeadline': flexibleDeadline,
+          'alertFrequency': alertFrequency,
+          'customReminder': customReminder,
+          'suggestedPaper': suggestedPaper,
+          'suggestedPaperAuthor': suggestedPaperAuthor,
+          'suggestedPaperPublishDate': suggestedPaperPublishDate,
+          'suggestedPaperUrl': suggestedPaperUrl,
+        });
+      }
+    }
+    // "Only this" option: Update only the current task
+    else if (option == "only_this") {
+      final taskRef = _db.collection(collectionPath).doc(task.id);
+      batch.update(taskRef, {
+        'title': title,
+        'description': description,
+        'points': points,
+        'category': category,
+        'keywords': keywords,
+        'attachments': attachments?.map((a) => a.toMap()).toList(),
+        'deadline': utcSelectedDeadline ?? task.deadline,
+        'repeatInterval': repeatInterval ?? task.repeatInterval,
+        'customRepeatDays': customRepeatDays,
+        'flexibleDeadline': flexibleDeadline,
+        'alertFrequency': alertFrequency,
+        'customReminder': customReminder,
+        'suggestedPaper': suggestedPaper,
+        'suggestedPaperAuthor': suggestedPaperAuthor,
+        'suggestedPaperPublishDate': suggestedPaperPublishDate,
+        'suggestedPaperUrl': suggestedPaperUrl,
+      });
+    }
+
+    // Commit the batch operation
+    await batch.commit();
+    log("Successfully updated repeating tasks with option: $option");
+  }
+
   // Delete a task from Firestore
   Future<void> deleteTask(String taskId) async {
     try {
