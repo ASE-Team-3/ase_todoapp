@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,36 +42,79 @@ class ResearchService {
 
   /// Fetches related research papers from the Scopus API.
   ///
-  /// The function performs a query using the provided keywords and retrieves
-  /// a list of research papers matching the criteria. It handles API responses
-  /// and errors gracefully.
+  /// This version targets TITLE, ABSTRACT, and KEYWORDS for better relevance.
   ///
+  /// - [keywords]: List of keywords for querying research papers.
   /// - Returns: A list of maps where each map contains paper details such as
-  ///   title, author, publish date, and DOI URL.
+  ///   title, authors, publish date, and DOI URL.
   Future<List<Map<String, String>>> fetchRelatedResearch(
       List<String> keywords) async {
-    final query = keywords.join(' ');
-    final uri = Uri.parse('$apiUrl/search/scopus?query=$query');
+    if (keywords.isEmpty) return [];
+
+    final refinedQuery = _buildRefinedQuery(keywords);
+    int start = 0; // Pagination start index
+    const int pageSize = 25; // Number of results per page
+    const int maxResults = 100; // Limit to avoid too many requests
+    List<Map<String, String>> papers = [];
+
+    log("INFO: Fetching research papers with query: $refinedQuery");
 
     try {
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'X-ELS-APIKey': apiKey,
-        },
-      );
+      while (start < maxResults) {
+        final uri = Uri.parse(
+            "$apiUrl/search/scopus?query=$refinedQuery&start=$start&count=$pageSize");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return _parseResearchPapers(data);
-      } else {
-        throw Exception(
-            'Failed to fetch research papers. Status: ${response.statusCode}');
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'X-ELS-APIKey': apiKey,
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final fetchedPapers = _parseResearchPapers(data);
+          if (fetchedPapers.isEmpty) break; // Stop if no more results
+
+          papers.addAll(fetchedPapers);
+          start += pageSize;
+        } else {
+          log("ERROR: Failed to fetch research papers. Status: ${response.statusCode}");
+          break; // Exit loop on failure
+        }
       }
+
+      log("INFO: Successfully fetched ${papers.length} research papers.");
+      return _removeDuplicates(papers);
     } catch (e) {
+      log("EXCEPTION: Error fetching research papers: $e");
       throw Exception('Error fetching research papers: $e');
     }
+  }
+
+  /// Builds a refined query string to search in TITLE, ABSTRACT, and KEYWORDS.
+  String _buildRefinedQuery(List<String> keywords) {
+    // Combine keywords into TITLE-ABS-KEY queries using AND operator
+    final queryParts = keywords.map((k) => 'TITLE-ABS-KEY("$k")').toList();
+    return queryParts.join(' AND ');
+  }
+
+  /// Removes duplicate papers based on title and DOI.
+  List<Map<String, String>> _removeDuplicates(
+      List<Map<String, String>> papers) {
+    final seen = <String>{};
+    final uniquePapers = <Map<String, String>>[];
+
+    for (var paper in papers) {
+      final uniqueIdentifier = "${paper['title']}_${paper['doi']}";
+      if (!seen.contains(uniqueIdentifier)) {
+        seen.add(uniqueIdentifier);
+        uniquePapers.add(paper);
+      }
+    }
+
+    return uniquePapers;
   }
 
   /// Parses research papers from the API response data.

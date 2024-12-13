@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:developer';
+import 'package:app/helpers/keyword_helpers.dart';
 import 'package:app/models/attachment.dart';
 import 'package:app/providers/task_provider.dart';
 import 'package:app/services/research_service.dart';
@@ -111,10 +112,7 @@ class _TaskCreateViewState extends State<TaskCreateView> {
 
   // Generates keywords by splitting the title and description into unique words
   List<String> generateKeywords(String title, String description) {
-    final allText = "$title $description".toLowerCase();
-    final words = allText.split(RegExp(r'\s+')).toSet();
-    final keywords = words.where((word) => word.length > 3).toList();
-    return keywords.take(5).toList();
+    return KeywordGenerator.generate(title, description);
   }
 
   @override
