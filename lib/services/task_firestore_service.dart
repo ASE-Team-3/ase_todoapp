@@ -461,6 +461,9 @@ class TaskFirestoreService {
       // Step 3: Add the subtask to Firestore
       await subTasksRef.doc(subTask.id).set(subTask.toMap());
 
+      // Recalculate parent task completion status
+      await _recalculateTaskCompletionStatus(taskId);
+
       // Step 4: Log success
       print(
           "Success: Subtask '${subTask.title}' added successfully with ID: ${subTask.id} under Task ID: $taskId");
@@ -919,6 +922,10 @@ class TaskFirestoreService {
 
       // Delete the subtask document from the Firestore subtask collection
       await subTasksRef.doc(subTaskId).delete();
+
+      // Recalculate parent task completion status
+      await _recalculateTaskCompletionStatus(taskId);
+
       print("Subtask removed successfully for Task ID: $taskId");
     } catch (e) {
       print("Error removing subtask: $e");
@@ -959,18 +966,25 @@ class TaskFirestoreService {
     });
   }
 
-  // Add a subtask item to a subtask
+  /// Add a subtask item to a subtask and recalculate statuses
   Future<void> addSubTaskItem(
       String taskId, String subTaskId, SubTaskItem item) async {
-    try {
-      final taskRef = _db.collection(collectionPath).doc(taskId);
-      final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
+    final taskRef = _db.collection(collectionPath).doc(taskId);
+    final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
 
+    try {
+      // Step 1: Add the new item to the subtask's items array
       await subTaskRef.update({
         'items': FieldValue.arrayUnion([item.toMap()])
       });
 
-      print("Subtask item added successfully for SubTask ID: $subTaskId");
+      print(
+          "Subtask item '${item.title}' added successfully for SubTask ID: $subTaskId");
+
+      // Step 2: Recalculate the subtask's completion status
+      await _recalculateSubTaskCompletionStatus(taskId, subTaskId);
+
+      print("Recalculated subtask status after adding item.");
     } catch (e) {
       print("Error adding subtask item: $e");
       rethrow;
@@ -1038,24 +1052,85 @@ class TaskFirestoreService {
     }
   }
 
-  // Remove a subtask item from a subtask
+  /// Remove a subtask item from a subtask and recalculate statuses
   Future<void> removeSubTaskItem(
       String taskId, String subTaskId, String itemId) async {
-    try {
-      final taskRef = _db.collection(collectionPath).doc(taskId);
-      final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
-      final subTaskDoc = await subTaskRef.get();
-      final subTaskData = subTaskDoc.data()!;
-      final items = List<Map<String, dynamic>>.from(subTaskData['items']);
-      final itemIndex = items.indexWhere((item) => item['id'] == itemId);
+    final taskRef = _db.collection(collectionPath).doc(taskId);
+    final subTaskRef = taskRef.collection('subtasks').doc(subTaskId);
 
-      if (itemIndex != -1) {
-        items.removeAt(itemIndex); // Remove the item
-        await subTaskRef.update({'items': items});
-        print("Subtask item removed successfully for Item ID: $itemId");
+    try {
+      // Step 1: Fetch the current subtask data
+      final subTaskDoc = await subTaskRef.get();
+      if (!subTaskDoc.exists) {
+        throw Exception("Subtask not found.");
       }
+
+      final subTaskData = subTaskDoc.data()!;
+      final items = List<Map<String, dynamic>>.from(subTaskData['items'] ?? []);
+
+      // Step 2: Remove the item by ID
+      final updatedItems = items.where((item) => item['id'] != itemId).toList();
+
+      // Step 3: Update the subtask with the updated items list
+      await subTaskRef.update({'items': updatedItems});
+
+      print("Subtask item removed successfully for Item ID: $itemId");
+
+      // Step 4: Recalculate the subtask's completion status
+      await _recalculateSubTaskCompletionStatus(taskId, subTaskId);
+
+      print("Recalculated subtask status after removing item.");
     } catch (e) {
       print("Error removing subtask item: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> _recalculateSubTaskCompletionStatus(
+      String taskId, String subTaskId) async {
+    final subTaskRef = _db
+        .collection(collectionPath)
+        .doc(taskId)
+        .collection('subtasks')
+        .doc(subTaskId);
+
+    try {
+      final subTaskSnapshot = await subTaskRef.get();
+      if (!subTaskSnapshot.exists) return;
+
+      final subTaskData = subTaskSnapshot.data()!;
+      final items = List<Map<String, dynamic>>.from(subTaskData['items'] ?? []);
+      final allItemsCompleted = items.isNotEmpty
+          ? items.every((item) => item['isCompleted'] == true)
+          : true;
+
+      await subTaskRef.update({'isCompleted': allItemsCompleted});
+
+      print("Subtask completion recalculated: $allItemsCompleted");
+
+      // Recalculate parent task status
+      await _recalculateTaskCompletionStatus(taskId);
+    } catch (e) {
+      print("Error recalculating subtask completion: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> _recalculateTaskCompletionStatus(String taskId) async {
+    final taskRef = _db.collection(collectionPath).doc(taskId);
+    final subTasksRef = taskRef.collection('subtasks');
+
+    try {
+      final subTasksSnapshot = await subTasksRef.get();
+      final allSubTasksCompleted = subTasksSnapshot.docs.isNotEmpty
+          ? subTasksSnapshot.docs.every((doc) => doc['isCompleted'] == true)
+          : false;
+
+      await taskRef.update({'isCompleted': allSubTasksCompleted});
+
+      print("Parent task completion recalculated: $allSubTasksCompleted");
+    } catch (e) {
+      print("Error recalculating task completion: $e");
       rethrow;
     }
   }
