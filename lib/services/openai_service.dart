@@ -10,7 +10,18 @@ import 'package:app/utils/deadline_utils.dart'; // Import the utility for deadli
 class OpenAIService {
   static const String apiUrl = "https://api.openai.com/v1/chat/completions";
 
-  Future<Map<String, String>> analyzeTask(Task task) async {
+  // Cache to store AI feedback: { taskId: { "message": "...", "recommendation": "..." } }
+  final Map<String, Map<String, String>> _feedbackCache = {};
+
+  /// Analyze a task and fetch AI feedback, with caching
+  Future<Map<String, String>> analyzeTask(Task task,
+      {bool forceRefresh = false}) async {
+    // Step 1: Check for cached data
+    if (!forceRefresh && _feedbackCache.containsKey(task.id)) {
+      log("INFO: Returning cached AI feedback for Task ID: ${task.id}");
+      return _feedbackCache[task.id]!;
+    }
+
     final apiKey = dotenv.env['OPENAI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('API key is missing or invalid');
@@ -25,17 +36,12 @@ class OpenAIService {
     final hoursRemaining = duration?.inHours.remainder(24) ?? -1;
     final minutesRemaining = duration?.inMinutes.remainder(60) ?? -1;
 
-    log("DEBUG: Task ID: ${task.id}");
-    log("DEBUG: Task Deadline (UTC): $deadline");
-    log("DEBUG: Current Time (UTC): $now");
-    log("DEBUG: Days Remaining: $daysRemaining");
-    log("DEBUG: Hours Remaining: $hoursRemaining");
-    log("DEBUG: Minutes Remaining: $minutesRemaining");
-
     final prompt =
         _generatePrompt(task, daysRemaining, hoursRemaining, minutesRemaining);
 
     try {
+      log("INFO: Fetching new AI feedback for Task ID: ${task.id}");
+
       final response = await http.post(
         Uri.parse(apiUrl),
         headers: {
@@ -43,19 +49,18 @@ class OpenAIService {
           'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
-          "model": "gpt-4", // Correct model
+          "model": "gpt-4",
           "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
           ],
           "max_tokens": 150,
-          "temperature": 0.2, // Short, deterministic responses
+          "temperature": 0.2,
         }),
       );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseBody = jsonDecode(response.body);
-        log("API Response: $responseBody");
 
         if (responseBody['choices'] == null ||
             responseBody['choices'].isEmpty) {
@@ -68,21 +73,27 @@ class OpenAIService {
           throw Exception('AI did not return any content');
         }
 
-        return _parseResponse(generatedText);
+        final feedback = _parseResponse(generatedText);
+
+        // Step 2: Cache the response
+        _feedbackCache[task.id] = feedback;
+
+        log("INFO: AI feedback cached for Task ID: ${task.id}");
+        return feedback;
       } else {
-        log("API response error: ${response.body}");
+        log("ERROR: API response error: ${response.body}");
         final error = jsonDecode(response.body)['error']['message'];
         throw Exception('Failed to fetch AI feedback: $error');
       }
     } catch (e) {
-      log("Exception in OpenAIService: $e");
+      log("EXCEPTION: Error in OpenAIService: $e");
       rethrow;
     }
   }
 
+  /// Generate the task analysis prompt
   String _generatePrompt(
       Task task, int daysRemaining, int hoursRemaining, int minutesRemaining) {
-    // Format remaining time
     String timeRemaining;
     if (daysRemaining > 0) {
       timeRemaining =
@@ -96,22 +107,18 @@ class OpenAIService {
       timeRemaining = "Deadline has passed.";
     }
 
-    // Include keywords if available
     String keywords = task.keywords.isNotEmpty
         ? "Keywords: ${task.keywords.join(", ")}"
         : "No specific keywords provided.";
 
-    // Include subtasks if available
     String subtasks = task.subTasks.isNotEmpty
         ? "Subtasks: ${task.subTasks.map((st) => st.title).join(", ")}"
         : "No subtasks listed.";
 
-    // Include repeating task details
     String repeatingInfo = task.isRepeating
         ? "This task repeats every ${task.repeatInterval ?? "custom interval"}."
         : "This is a one-time task.";
 
-    // Include category and priority
     String priority = task.priority == 1
         ? "High"
         : task.priority == 2
@@ -137,6 +144,7 @@ Provide:
     ''';
   }
 
+  /// Parse AI response into structured feedback
   Map<String, String> _parseResponse(String response) {
     String motivationalMessage = "";
     String recommendations = "";
@@ -154,9 +162,6 @@ Provide:
       recommendations = recommendationsMatch.group(1)?.trim() ?? "";
     }
 
-    log("Parsed Motivational Message: $motivationalMessage");
-    log("Parsed Recommendations: $recommendations");
-
     return {
       "message": motivationalMessage.isNotEmpty
           ? motivationalMessage
@@ -165,6 +170,14 @@ Provide:
           ? recommendations
           : "No recommendations available.",
     };
+  }
+
+  /// Force refresh cached feedback for a specific task
+  void clearCacheForTask(String taskId) {
+    if (_feedbackCache.containsKey(taskId)) {
+      _feedbackCache.remove(taskId);
+      log("INFO: AI feedback cache cleared for Task ID: $taskId");
+    }
   }
 
   Future<Task> createTaskFromPrompt(String prompt) async {

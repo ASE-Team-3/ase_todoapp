@@ -436,48 +436,30 @@ class TaskDetailView extends StatelessWidget {
 
   // Helper Method for displaying AI feedback
   Widget _buildAiFeedbackSection(BuildContext context, Task task) {
-    return FutureBuilder<Map<String, String>>(
-      future: fetchAIFeedback(context, task),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Column(
-            children: [
-              Text(
-                "Error: ${snapshot.error}",
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: () {
-                  (context as Element).markNeedsBuild();
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text("Try Again"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryColor,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          );
-        } else if (snapshot.hasData) {
-          final feedback = snapshot.data!;
-          return AIFeedbackWidget(
-            feedbackMessage:
-                feedback['message'] ?? "No motivational message available",
-            recommendation:
-                feedback['recommendation'] ?? "No recommendation available",
-            onRefresh: () async {
-              await fetchAIFeedback(context, task); // Re-fetch AI feedback
-            },
-          );
-        }
+    final openAIService = Provider.of<OpenAIService>(context, listen: false);
 
-        return const Center(
-          child: Text("No AI feedback available."),
-        );
+    // Cached feedback to avoid refetching unnecessarily
+    Map<String, String>? cachedFeedback;
+    bool isCached = false;
+
+    // Function to fetch AI feedback with optional forceRefresh
+    Future<Map<String, String>> fetchAIFeedback(
+        {bool forceRefresh = false}) async {
+      if (forceRefresh || !isCached) {
+        final feedback =
+            await openAIService.analyzeTask(task, forceRefresh: forceRefresh);
+        cachedFeedback = feedback;
+        isCached = true;
+        return feedback;
+      } else {
+        return cachedFeedback!;
+      }
+    }
+
+    return AIFeedbackWidget(
+      onRefresh: ({bool forceRefresh = false}) async {
+        final feedback = await fetchAIFeedback(forceRefresh: forceRefresh);
+        return feedback;
       },
     );
   }
@@ -635,23 +617,6 @@ class TaskDetailView extends StatelessWidget {
           );
         },
       );
-    }
-  }
-
-  // Helper function to fetch AI feedback
-  Future<Map<String, String>> fetchAIFeedback(
-      BuildContext context, Task task) async {
-    final openAIService = Provider.of<OpenAIService>(context, listen: false);
-
-    try {
-      return await openAIService.analyzeTask(task);
-    } catch (e, stackTrace) {
-      debugPrint("Error fetching AI feedback: $e");
-      debugPrint("Stack trace: $stackTrace");
-      return {
-        "message": "Unable to fetch AI feedback",
-        "recommendation": "",
-      };
     }
   }
 
