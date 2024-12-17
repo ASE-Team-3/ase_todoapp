@@ -114,5 +114,3 @@ For any inquiries or feedback, please contact:
 - [Flutter Community](https://flutter.dev/community)
 
 ```
-
-This format provides a detailed overview, setup instructions, and a professional structure for your repository. Let me know if you'd like this applied directly to your repository or need further refinements!
