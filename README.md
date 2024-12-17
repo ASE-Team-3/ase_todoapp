@@ -1,4 +1,4 @@
-# app
+# Yeongu
 
 A new Flutter project.
 
